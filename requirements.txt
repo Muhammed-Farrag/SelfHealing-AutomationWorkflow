@@ -1,0 +1,9 @@
+apache-airflow>=2.8
+requests
+sentence-transformers
+faiss-cpu
+pyyaml
+python-dotenv
+openai
+ollama
+rich
