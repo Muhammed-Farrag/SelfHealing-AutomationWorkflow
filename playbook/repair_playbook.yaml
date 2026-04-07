@@ -1,0 +1,123 @@
+- entry_id: "pb_001"
+  failure_class: "timeout"
+  title: "Increase API timeout and add retry"
+  description: >
+    The task failed because the HTTP request exceeded the configured timeout.
+    Increase API_TIMEOUT and add retry logic.
+  repair_actions:
+    - operator: "set_env"
+      param: "API_TIMEOUT"
+      value: "30"
+    - operator: "set_env"
+      param: "API_RETRIES"
+      value: "3"
+  confidence_floor: 0.6
+  tags: ["http", "timeout", "retry"]
+
+- entry_id: "pb_002"
+  failure_class: "timeout"
+  title: "Increase Operator execution timeout"
+  description: >
+    The Airflow operator task exceeded execution_timeout constraints due to slow DB response.
+  repair_actions:
+    - operator: "set_timeout"
+      param: "execution_timeout"
+      value: "3600"
+  confidence_floor: 0.7
+  tags: ["timeout", "execution", "airflow"]
+
+- entry_id: "pb_003"
+  failure_class: "http_error"
+  title: "Handle 503 Server Unavailable with extended retries"
+  description: >
+    Upstream API threw 503 HTTP error intermittently. Set robust retries to wait for recovery.
+  repair_actions:
+    - operator: "set_retry"
+      param: "retries"
+      value: "5"
+  confidence_floor: 0.8
+  tags: ["http_error", "503", "retry"]
+
+- entry_id: "pb_004"
+  failure_class: "http_error"
+  title: "Bypass SSL Verification temporarily for invalid cert"
+  description: >
+    HTTP error due to expired target SSL cert. Set environment to bypass if acceptable.
+  repair_actions:
+    - operator: "set_env"
+      param: "VERIFY_SSL"
+      value: "False"
+  confidence_floor: 0.4
+  tags: ["http_error", "ssl", "cert"]
+
+- entry_id: "pb_005"
+  failure_class: "missing_file"
+  title: "Add file existence precheck"
+  description: >
+    Task tripped over missing input file before it was generated. Add a sensor or precheck.
+  repair_actions:
+    - operator: "add_precheck"
+      param: "file_path"
+      value: "/data/landing/input.csv"
+  confidence_floor: 0.9
+  tags: ["missing_file", "precheck", "sensor"]
+
+- entry_id: "pb_006"
+  failure_class: "missing_file"
+  title: "Fallback to previous day snapshot path"
+  description: >
+    The required datestamped file is missing. Replace the path pattern to fallback to yesterday's snapshot.
+  repair_actions:
+    - operator: "replace_path"
+      param: "FILE_DATE"
+      value: "{{ ds_nodash_yesterday }}"
+  confidence_floor: 0.5
+  tags: ["missing_file", "fallback", "date"]
+
+- entry_id: "pb_007"
+  failure_class: "missing_column"
+  title: "Set default value logic for missing optional column"
+  description: >
+    Source dataframe missing an expected optional column. Set environment to allow soft fail / fill defaults.
+  repair_actions:
+    - operator: "set_env"
+      param: "ALLOW_MISSING_COLS"
+      value: "True"
+  confidence_floor: 0.6
+  tags: ["missing_column", "pandas", "data_quality"]
+
+- entry_id: "pb_008"
+  failure_class: "missing_column"
+  title: "Fallback mapping for renamed column"
+  description: >
+    Vendor renamed column in source data. Replace mapped path logic environment variable.
+  repair_actions:
+    - operator: "set_env"
+      param: "COLUMN_MAPPING_OVERRIDE"
+      value: "new_col_name:old_col_name"
+  confidence_floor: 0.8
+  tags: ["missing_column", "vendor_change", "mapping"]
+
+- entry_id: "pb_009"
+  failure_class: "missing_db"
+  title: "Enable DB connection precheck"
+  description: >
+    Task failed as target database cluster was unavailable. Add a connection precheck sensor.
+  repair_actions:
+    - operator: "add_precheck"
+      param: "db_conn_id"
+      value: "target_db"
+  confidence_floor: 0.7
+  tags: ["missing_db", "connection", "precheck"]
+
+- entry_id: "pb_010"
+  failure_class: "missing_db"
+  title: "Route to readonly replica"
+  description: >
+    Primary database is missing or down. Set environment flag to use readonly replica for read operations.
+  repair_actions:
+    - operator: "set_env"
+      param: "USE_DB_REPLICA"
+      value: "True"
+  confidence_floor: 0.6
+  tags: ["missing_db", "replica", "failover"]
