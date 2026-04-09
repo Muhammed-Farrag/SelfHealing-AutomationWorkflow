@@ -280,7 +280,7 @@ def generate_episode(
     triggered_at: str = datetime.now(timezone.utc).isoformat()
 
     print(f"\n{'='*60}")
-    print(f"Episode {episode_id} | seed={seed} | {failure_type} → {target_dag}")
+    print(f"Episode {episode_id} | seed={seed} | {failure_type} -> {target_dag}")
     print(f"{'='*60}")
 
     # Inject the failure
@@ -291,7 +291,24 @@ def generate_episode(
         print(f"  [DRY RUN] Would inject: {env_overrides}")
         print(f"  [DRY RUN] Would trigger DAG '{target_dag}'")
         print(f"  [DRY RUN] Expected failing task: '{failing_task}'")
-        return None
+        signature_index = min(seed % len(signature_tokens), len(signature_tokens) - 1)
+        mock_signature = signature_tokens[signature_index]
+        return {
+            "episode_id": episode_id,
+            "seed": seed,
+            "dag_id": target_dag,
+            "task_id": failing_task,
+            "run_id": f"dry_run_{episode_id}",
+            "try_number": 1,
+            "failure_type": failure_type,
+            "error_signature": mock_signature,
+            "failure_class": "",
+            "log_excerpt": f"[2026-04-08] ERROR - {mock_signature} occurred during execution.",
+            "injected_env": env_overrides,
+            "triggered_at": triggered_at,
+            "terminal_state": "failed",
+            "mttr_start": triggered_at,
+        }
 
     # Unpause and trigger the DAG, passing overrides as dag_run.conf
     try:
@@ -389,15 +406,15 @@ def main() -> None:
     injector = FailureInjector()
     failure_types: list[str] = FailureInjector.list_types()
 
-    print("╔══════════════════════════════════════════════════════════╗")
-    print("║       Self-Healing AI — Episode Generator               ║")
-    print("╠══════════════════════════════════════════════════════════╣")
-    print(f"║  Failure types : {len(failure_types):>3d}                                  ║")
-    print(f"║  Seeds per type: {NUM_SEEDS:>3d}                                  ║")
-    print(f"║  Total episodes: {len(failure_types) * NUM_SEEDS:>3d}                                  ║")
-    print(f"║  Output        : {str(output_path):<40s} ║")
-    print(f"║  Dry run       : {str(args.dry_run):<40s} ║")
-    print("╚══════════════════════════════════════════════════════════╝")
+    print("#" * 70)
+    print("      SELF-HEALING WORKFLOW AI — EPISODE GENERATOR (M1)")
+    print("#" * 70 + "\n")
+    print(f"#  Failure types : {len(failure_types):>3d}                                  #")
+    print(f"#  Seeds per type: {NUM_SEEDS:>3d}                                  #")
+    print(f"#  Total episodes: {len(failure_types) * NUM_SEEDS:>3d}                                  #")
+    print(f"#  Output        : {str(output_path):<40s} #")
+    print(f"#  Dry run       : {str(args.dry_run):<40s} #")
+    print("#" * 70)
 
     episode_num: int = 0
     generated_count: int = 0

@@ -16,6 +16,7 @@ webserver_config.py
 postgres-db-volume/
 
 # Env & injection state
+.env
 .env.inject
 injection_state.json
 
