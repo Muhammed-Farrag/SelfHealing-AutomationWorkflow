@@ -1,0 +1,86 @@
+{
+    "validation_accuracy": 0.8333333333333334,
+    "test_accuracy": 0.9166666666666666,
+    "classification_report": {
+        "http_error": {
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1-score": 0.6666666666666666,
+            "support": 2.0
+        },
+        "missing_column": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 3.0
+        },
+        "missing_db": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+        },
+        "missing_file": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2.0
+        },
+        "timeout": {
+            "precision": 0.75,
+            "recall": 1.0,
+            "f1-score": 0.8571428571428571,
+            "support": 3.0
+        },
+        "accuracy": 0.9166666666666666,
+        "macro avg": {
+            "precision": 0.95,
+            "recall": 0.9,
+            "f1-score": 0.9047619047619048,
+            "support": 12.0
+        },
+        "weighted avg": {
+            "precision": 0.9375,
+            "recall": 0.9166666666666666,
+            "f1-score": 0.9087301587301586,
+            "support": 12.0
+        }
+    },
+    "confusion_matrix": [
+        [
+            1,
+            0,
+            0,
+            0,
+            1
+        ],
+        [
+            0,
+            3,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            2,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            2,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            3
+        ]
+    ]
+}
