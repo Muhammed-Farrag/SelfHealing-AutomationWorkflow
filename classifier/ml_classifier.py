@@ -1,168 +1,132 @@
-from __future__ import annotations
-
-import os
-import json
+# ml_classifier.py
 import argparse
-from typing import List, Dict, Any
-
-import joblib
+import json
+import os
+import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.pipeline import Pipeline
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score, cross_val_predict
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
+# -----------------------------
+# Classifier
+# -----------------------------
+class MLClassifier:
+    def __init__(self):
+        self.pipeline = None
+        self.vectorizer = TfidfVectorizer()
+        self.model = LogisticRegression(max_iter=500)
+        self.history = {"train_accuracy": [], "val_accuracy": [], "test_accuracy": []}
 
-class TFIDFFailureClassifier:
-    """
-    TF-IDF + Logistic Regression classifier for failure classification.
-    """
+    # Train the model
+    def train(self, train_file):
+        # Load data
+        import jsonlines
+        logs, labels = [], []
+        with jsonlines.open(train_file) as reader:
+            for obj in reader:
+                logs.append(obj['log_excerpt'])
+                labels.append(obj['failure_class'])
 
-    def __init__(self, model_path: str = "models/tfidf_classifier.pkl") -> None:
-        """
-        Initialize classifier. Creates models/ directory if it doesn't exist.
-        """
-        self.model_path = model_path
-        self.pipeline: Pipeline | None = None
-        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        # Split into train/val/test
+        X_train, X_temp, y_train, y_temp = train_test_split(logs, labels, test_size=0.4, random_state=42, stratify=labels)
+        X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp)
 
-    def _load_jsonl(self, path: str) -> List[Dict[str, Any]]:
-        """
-        Load JSONL dataset.
-        """
-        with open(path, "r", encoding="utf-8") as f:
-            return [json.loads(line) for line in f if line.strip()]
+        # Vectorize
+        X_train_vec = self.vectorizer.fit_transform(X_train)
+        X_val_vec = self.vectorizer.transform(X_val)
+        X_test_vec = self.vectorizer.transform(X_test)
 
-    def train(self, jsonl_path: str) -> dict:
-        """
-        Train TF-IDF + Logistic Regression on labeled dataset.
-        """
-        data = self._load_jsonl(jsonl_path)
+        # Train
+        self.model.fit(X_train_vec, y_train)
 
-        texts, labels = [], []
+        # Save pipeline
+        self.pipeline = (self.vectorizer, self.model)
 
-        for row in data:
-            text = f"{row['log_excerpt']} EVENTID_{row.get('event_id', '')}"
-            texts.append(text)
-            labels.append(row["failure_class"])
+        # Evaluate
+        train_acc = accuracy_score(y_train, self.model.predict(X_train_vec))
+        val_acc = accuracy_score(y_val, self.model.predict(X_val_vec))
+        test_acc = accuracy_score(y_test, self.model.predict(X_test_vec))
 
-        self.pipeline = Pipeline([
-            ("tfidf", TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
-            ("clf", LogisticRegression(max_iter=1000, C=1.0, multi_class='multinomial'))
-        ])
+        self.history["train_accuracy"].append(train_acc)
+        self.history["val_accuracy"].append(val_acc)
+        self.history["test_accuracy"].append(test_acc)
 
-        # CV fold adjustment
-        n_samples = len(texts)
-        min_class_count = min([labels.count(l) for l in set(labels)])
-        cv_folds = min(5, n_samples, min_class_count)
-
-        if cv_folds < 2:
-            print("Warning: Not enough samples per class for cross-validation. Skipping CV.")
-            acc_scores = np.array([1.0])
-            preds = labels
-            report = classification_report(labels, preds, output_dict=True)
-        else:
-            acc_scores = cross_val_score(self.pipeline, texts, labels, cv=cv_folds, scoring="accuracy")
-            preds = cross_val_predict(self.pipeline, texts, labels, cv=cv_folds)
-            report = classification_report(labels, preds, output_dict=True)
-
-        # Train final model
-        self.pipeline.fit(texts, labels)
-        joblib.dump(self.pipeline, self.model_path)
-
-        class_dist = {label: labels.count(label) for label in set(labels)}
-        per_class_f1 = {
-            cls: report[cls]["f1-score"]
-            for cls in report if cls not in ("accuracy", "macro avg", "weighted avg")
+        # Metrics
+        y_pred = self.model.predict(X_test_vec)
+        metrics = {
+            "validation_accuracy": val_acc,
+            "test_accuracy": test_acc,
+            "classification_report": classification_report(y_test, y_pred, output_dict=True, zero_division=0),
+            "confusion_matrix": confusion_matrix(y_test, y_pred).tolist()
         }
 
-        return {
-            "cv_accuracy_mean": float(np.mean(acc_scores)),
-            "cv_accuracy_std": float(np.std(acc_scores)),
-            "per_class_f1": per_class_f1,
-            "total_samples": len(labels),
-            "class_distribution": class_dist,
-            "model_path": self.model_path
-        }
+        # Save results folder
+        os.makedirs("results", exist_ok=True)
+        with open("results/metrics.json", "w") as f:
+            json.dump(metrics, f, indent=4)
 
-    def _ensure_model_loaded(self) -> None:
-        if self.pipeline is None:
-            if not os.path.exists(self.model_path):
-                raise RuntimeError(
-                    "Model not found. Please run training first using --train."
-                )
-            self.pipeline = joblib.load(self.model_path)
+        # Plot accuracies
+        self.plot_accuracy(train_acc, val_acc, test_acc)
 
-    def predict(self, log_excerpt: str, event_id: str = "") -> dict:
-        """
-        Predict single log excerpt.
-        """
-        self._ensure_model_loaded()
-        text = f"{log_excerpt} EVENTID_{event_id}"
+        # Plot confusion matrix
+        self.plot_confusion_matrix(metrics["confusion_matrix"], labels=list(set(labels)))
 
-        probs = self.pipeline.predict_proba([text])[0]
-        classes = self.pipeline.classes_
-        max_idx = int(np.argmax(probs))
+        print("Training completed. Metrics saved in 'results/metrics.json'.")
+        print("Accuracy plot and confusion matrix saved in 'results/' folder.")
 
-        return {
-            "failure_class": classes[max_idx],
-            "confidence": float(probs[max_idx]),
-            "all_probabilities": {cls: float(prob) for cls, prob in zip(classes, probs)}
-        }
+    # Predict a single log
+    def predict_log(self, log_text):
+        if not self.pipeline:
+            raise Exception("Model not trained yet.")
+        vectorizer, model = self.pipeline
+        vec = vectorizer.transform([log_text])
+        return model.predict(vec)[0]
 
-    def predict_batch(self, jsonl_path: str, output_path: str) -> None:
-        """
-        Batch prediction for JSONL dataset.
-        """
-        self._ensure_model_loaded()
-        data = self._load_jsonl(jsonl_path)
+    # Plot accuracy bar chart
+    def plot_accuracy(self, train_acc, val_acc, test_acc):
+        plt.figure(figsize=(8,6))
+        plt.bar(['Train', 'Validation', 'Test'], [train_acc, val_acc, test_acc], color=['blue', 'orange', 'green'])
+        plt.ylim(0, 1)
+        plt.ylabel("Accuracy")
+        plt.title("Accuracy after training")
+        plt.savefig("results/accuracy_plot.png")
+        plt.close()
 
-        y_true, y_pred = [], []
+    # Plot confusion matrix heatmap
+    def plot_confusion_matrix(self, cm, labels):
+        plt.figure(figsize=(8,6))
+        sns.heatmap(np.array(cm), annot=True, fmt='d', xticklabels=labels, yticklabels=labels, cmap="Blues")
+        plt.xlabel("Predicted")
+        plt.ylabel("Actual")
+        plt.title("Confusion Matrix")
+        plt.savefig("results/confusion_matrix.png")
+        plt.close()
 
-        with open(output_path, "a", encoding="utf-8") as out:
-            for row in data:
-                result = self.predict(row["log_excerpt"], row.get("event_id", ""))
-                row["ml_failure_class"] = result["failure_class"]
-                row["ml_confidence"] = result["confidence"]
-
-                y_true.append(row.get("failure_class"))
-                y_pred.append(result["failure_class"])
-
-                out.write(json.dumps(row) + "\n")
-                out.flush()
-
-        print("\nClassification Report:\n")
-        print(classification_report(y_true, y_pred))
-
-
-# ------------------- CLI -------------------
+# -----------------------------
+# Main function
+# -----------------------------
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--train", type=str, help="Train on a JSONL dataset")
-    parser.add_argument("--log", type=str, help="Predict single log excerpt")
-    parser.add_argument("--event-id", type=str, default="", help="Event ID for single log")
-    parser.add_argument("--predict-batch", type=str, help="Predict batch JSONL dataset")
-    parser.add_argument("--out", type=str, help="Output path for batch prediction")
+    parser = argparse.ArgumentParser(description="Train or predict failure logs")
+    parser.add_argument("--train", help="Path to training JSONL file")
+    parser.add_argument("--log", help="Single log string to predict")
     args = parser.parse_args()
 
-    clf = TFIDFFailureClassifier()
+    clf = MLClassifier()
 
     if args.train:
-        report = clf.train(args.train)
-        print("Training completed. Report:")
-        print(json.dumps(report, indent=2))
+        clf.train(args.train)
 
-    elif args.log:
-        result = clf.predict(args.log, args.event_id)
-        print(json.dumps(result, indent=2))
+    if args.log:
+        try:
+            prediction = clf.predict_log(args.log)
+            print(f"Predicted failure class: {prediction}")
+        except Exception as e:
+            print("Error:", str(e))
 
-    elif args.predict_batch and args.out:
-        clf.predict_batch(args.predict_batch, args.out)
-
-    else:
-        parser.print_help()
-
-
+# -----------------------------
 if __name__ == "__main__":
     main()
