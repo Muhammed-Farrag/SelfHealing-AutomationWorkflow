@@ -9,3 +9,4 @@ ollama
 rich
 scikit-learn>=1.4
 joblib
+pytest
