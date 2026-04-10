@@ -31,11 +31,11 @@ console = Console()
 # Schema constants
 # ---------------------------------------------------------------------------
 FAILURE_CLASSES = {
-    "missing_env_var",
-    "path_not_found",
     "timeout",
-    "retry_exceeded",
-    "dependency_failure",
+    "http_error",
+    "missing_file",
+    "missing_column",
+    "missing_db",
 }
 
 SYSTEM_PROMPT = (
@@ -44,7 +44,13 @@ SYSTEM_PROMPT = (
     "code fences.\n\n"
     "You must choose repair actions exclusively from this operator allowlist:\n"
     "  set_env | set_retry | set_timeout | replace_path | add_precheck\n\n"
-    "Violation of the schema or use of unlisted operators will be rejected.\n\n"
+    "Rules for Operators:\n"
+    "  - set_retry: param MUST be 'retries'. Requires 'dag_id'.\n"
+    "  - set_timeout: param MUST be 'execution_timeout'. Requires 'dag_id'.\n"
+    "  - add_precheck: Requires 'dag_id'. value is the code to inject.\n"
+    "  - set_env: Modifies .env.inject. param is the env var name.\n"
+    "  - replace_path: Modifies .env.inject. param is the env var name.\n\n"
+    "Violation of any rule or use of unlisted operators will be rejected.\n\n"
     "You MUST output exactly this JSON schema:\n"
     "{\n"
     "  \"plan_id\": \"plan_<episode_id>\",\n"
@@ -54,7 +60,8 @@ SYSTEM_PROMPT = (
     "  \"repair_actions\": [\n"
     "    {\n"
     "      \"operator\": \"<one of allowlist operators>\",\n"
-    "      \"param\": \"<key name>\",\n"
+    "      \"dag_id\": \"<the dag_id of the failure, REQUIRED for DAG operators>\",\n"
+    "      \"param\": \"<exact key name>\",\n"
     "      \"value\": \"<new value as string>\",\n"
     "      \"justification\": \"<short reason>\"\n"
     "    }\n"
@@ -168,17 +175,25 @@ class RepairPlanner:
         else:
             self.model_name = model_name
             api_key = os.getenv("OPENAI_API_KEY")
+            base_url = os.getenv("OPENAI_BASE_URL")
+            
+            # Auto-detect Groq if Groq key exists and OpenAI key doesn't
+            groq_key = os.getenv("GROQ_API_KEY")
+            if not api_key and groq_key:
+                api_key = groq_key
+                base_url = base_url or "https://api.groq.com/openai/v1"
+                self.model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+                console.print(f"[bold green]Auto-detected Groq config![/bold green]")
+
             if not api_key:
                 console.print(
-                    "[bold yellow]Warning:[/bold yellow] OPENAI_API_KEY is not set. "
-                    "Set it in your .env file to use GPT-4o."
+                    "[bold yellow]Warning:[/bold yellow] No LLM API key set. "
+                    "Set OPENAI_API_KEY or GROQ_API_KEY in your .env file."
                 )
                 sys.exit(1)
-            # Import here so the module is usable without openai installed in local mode
+
             try:
-                from openai import OpenAI  # type: ignore[import-untyped]
-                
-                base_url = os.getenv("OPENAI_BASE_URL")
+                from openai import OpenAI
                 if base_url:
                     self._openai_client = OpenAI(api_key=api_key, base_url=base_url)
                 else:
@@ -188,9 +203,9 @@ class RepairPlanner:
                     "openai package is required for cloud mode. "
                     "Install it with: pip install openai"
                 ) from exc
+            
             console.print(
-                f"[bold cyan]RepairPlanner[/bold cyan] -> using OpenAI model "
-                f"[bold]{self.model_name}[/bold]"
+                f"[bold cyan]RepairPlanner[/bold cyan] -> using [bold]{self.model_name}[/bold]"
             )
 
     # ------------------------------------------------------------------

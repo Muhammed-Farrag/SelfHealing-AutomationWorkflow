@@ -47,6 +47,7 @@ class RegexFailureClassifier:
                 "execution_timeout",
                 "ConnectTimeout",
                 "ConnectionPool",
+                r"\btimeout\b",
             ],
         ),
         (
@@ -57,6 +58,8 @@ class RegexFailureClassifier:
                 r"5[0-9]{2} Server Error",
                 "ConnectionError",
                 "NOT FOUND for url",
+                r"\b404\b",
+                "Client Error",
             ],
         ),
         (
@@ -67,6 +70,8 @@ class RegexFailureClassifier:
                 "cannot open",
                 "ENOENT",
                 r"Errno 2",
+                "No such file",
+                r"\bnonexistent\b(?!\.db)",
             ],
         ),
         (
@@ -77,6 +82,7 @@ class RegexFailureClassifier:
                 r"missing.*column",
                 "nonexistent_column",
                 "not found.*Available columns",
+                r"\bcolumn\b",
             ],
         ),
         (
@@ -87,6 +93,8 @@ class RegexFailureClassifier:
                 "sqlite3.OperationalError",
                 r"database.*not found",
                 "No tables found in database",
+                "unable to open",
+                r"\bdatabase\b",
             ],
         ),
         (

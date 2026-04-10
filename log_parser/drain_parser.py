@@ -408,6 +408,9 @@ class DrainParser:
             log,
             flags=re.IGNORECASE,
         )
+        # Mask embedded Airflow ISO dates and standard timestamps
+        log = re.sub(r"\d{8}T\d{6}[Z+\-\d:\.]*", "<*>", log)
+        log = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[Z+\-\d:\.]*", "<*>", log)
         return log.split()
 
     def _mask_variables(self, tokens: list[str]) -> list[str]:
@@ -417,7 +420,9 @@ class DrainParser:
         """
         result: list[str] = []
         for token in tokens:
-            if self._VARIABLE_RE.fullmatch(token):
+            core_token = token.rstrip(",.;:)'\"")
+            core_token = core_token.lstrip("('\"")
+            if self._VARIABLE_RE.fullmatch(core_token) or token == "<*>":
                 result.append(self._WILDCARD)
             else:
                 result.append(token)
