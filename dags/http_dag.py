@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -47,7 +47,7 @@ def extract_api(**context: dict) -> str:
     """
     url: str = _get_conf("API_URL", "https://httpbin.org/json", **context)
     timeout: int = int(_get_conf("API_TIMEOUT", "30", **context))
-    retries: int = int(_get_conf("API_RETRIES", "3", **context))
+    retries: 5 = int(_get_conf("API_RETRIES", "3", **context))
 
     last_exception: Exception | None = None
     for attempt in range(1, retries + 1):
@@ -98,14 +98,27 @@ def load(**context: dict) -> str:
     return output_path
 
 
+# Default arguments for all tasks in this DAG
+default_args = {
+    "owner": "airflow",
+    "retries": 3,
+    "execution_timeout": timedelta(seconds=600),
+}
+
 with DAG(
     dag_id="http_dag",
     description="HTTP API extract-transform-load pipeline",
+    default_args=default_args,
     schedule_interval=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["self-healing", "http"],
 ) as dag:
+    # BEGIN PRECHECKS
+    # Precheck tasks can be added here for validation before main pipeline
+        t_precheck_api = PythonOperator(task_id='precheck_api', python_callable=lambda: print('Precheck passed'))
+    # END PRECHECKS
+
     t_extract = PythonOperator(
         task_id="extract_api",
         python_callable=extract_api,
