@@ -24,10 +24,11 @@ class MLClassifier:
     # Train the model
     def train(self, train_file):
         # Load data
-        import jsonlines
         logs, labels = [], []
-        with jsonlines.open(train_file) as reader:
-            for obj in reader:
+        with open(train_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip(): continue
+                obj = json.loads(line)
                 logs.append(obj['log_excerpt'])
                 labels.append(obj['failure_class'])
 
