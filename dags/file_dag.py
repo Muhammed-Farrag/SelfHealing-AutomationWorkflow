@@ -10,7 +10,7 @@ so failures can be injected without modifying DAG code.
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -84,14 +84,26 @@ def write_output(**context: dict) -> str:
     return output_path
 
 
+# Default arguments for all tasks in this DAG
+default_args = {
+    "owner": "airflow",
+    "retries": 3,
+    "execution_timeout": timedelta(seconds=600),
+}
+
 with DAG(
     dag_id="file_dag",
     description="File read-process-write pipeline",
+    default_args=default_args,
     schedule_interval=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["self-healing", "file"],
 ) as dag:
+    # BEGIN PRECHECKS
+    # Precheck tasks can be added here for validation before main pipeline
+    # END PRECHECKS
+
     t_read = PythonOperator(
         task_id="read_file",
         python_callable=read_file,
