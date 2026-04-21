@@ -386,7 +386,12 @@ Generated at: {datetime.now(timezone.utc).isoformat()}
             console.print(f"[yellow]DRY RUN: Would revert commit {commit_hash} for plan {plan_id}[/yellow]")
             new_hash = "DRY_RUN_HASH"
         else:
-            new_hash = self._git_revert(commit_hash)
+            # Get the list of files touched by this commit to inform the user
+            files_res = subprocess.run(["git", "show", "--name-only", "--format=%b", commit_hash], cwd=self.project_root, capture_output=True, text=True)
+            touched_files = [f for f in files_res.stdout.splitlines() if f.strip()]
+            
+            console.print(f"[dim]Reverting changes to: {', '.join(touched_files)}[/dim]")
+            new_hash = self._git_revert(commit_hash, plan_id)
 
         record = {
             "decision_id": f"rollback_{plan_id}",
@@ -523,14 +528,38 @@ Generated at: {datetime.now(timezone.utc).isoformat()}
             f.write(json.dumps(record) + "\n")
             f.flush()
 
-    def _git_revert(self, commit_hash: str) -> str:
+    def _git_revert(self, commit_hash: str, plan_id: str = "unknown") -> str:
+        """
+        Run git revert <commit_hash> --no-edit. 
+        If conflicts occur in logs/governance files, resolve them automatically.
+        """
         if not (self.project_root / ".git").exists():
             raise RuntimeError("Project is not a Git repository.")
         
-        # Git revert -n --no-edit ensures no editor opens
+        # 1. Attempt revert
         res = subprocess.run(["git", "revert", commit_hash, "--no-edit"], cwd=self.project_root, capture_output=True, text=True)
+        
         if res.returncode != 0:
-            raise RuntimeError(f"Git revert failed:\n{res.stderr}")
+            # 2. Handle conflicts in log files automatically if they occur
+            console.print("[yellow]Conflicts detected during rollback. Resolving log files...[/yellow]")
+            
+            # Identify files with conflicts
+            status_res = subprocess.run(["git", "status", "--porcelain"], cwd=self.project_root, capture_output=True, text=True)
+            conflicts = [line[3:] for line in status_res.stdout.splitlines() if line.startswith("UU ") or line.startswith("AA ")]
+            
+            for file_path in conflicts:
+                # If it's a log or governance file, keep the current 'HEAD' version to avoid breaking the audit trail
+                if any(x in file_path for x in ["data/", "governance/", "patcher/"]):
+                    subprocess.run(["git", "checkout", "--ours", file_path], cwd=self.project_root)
+                    subprocess.run(["git", "add", file_path], cwd=self.project_root)
+                    console.print(f"  [dim]Resolved {file_path} by keeping current version[/dim]")
+            
+            # 3. Complete the revert
+            res = subprocess.run(["git", "revert", "--continue", "--no-edit"], cwd=self.project_root, capture_output=True, text=True, env={**os.environ, "GIT_EDITOR": "true"})
+            if res.returncode != 0:
+                # If still failing, abort and raise
+                subprocess.run(["git", "revert", "--abort"], cwd=self.project_root)
+                raise RuntimeError(f"Git revert failed after conflict resolution attempt:\n{res.stderr}")
         
         # Get the new hash
         res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.project_root, capture_output=True, text=True)
