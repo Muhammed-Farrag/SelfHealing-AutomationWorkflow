@@ -132,6 +132,8 @@ with DAG(
     # BEGIN PRECHECKS
     # Precheck tasks can be added here for validation before main pipeline
     check_for_required_columns
+    nonexistent_column
+    nonexistent_column
     # END PRECHECKS
 
     t_read = PythonOperator(
