@@ -1,5 +1,5 @@
 # Self-Healing AI Audit Report
-Generated at: 2026-04-21T20:12:29.132841+00:00
+Generated at: 2026-04-21T20:31:02.515148+00:00
 
 ## Summary Metrics
 - **Total Plans Processed**: 60
@@ -10,7 +10,7 @@ Generated at: 2026-04-21T20:12:29.132841+00:00
 - **Validation Success Rate**: 0.0% (0/0)
 
 ## Rollbacks Performed
-No rollbacks performed.
+- Plan plan_ep_039 (Commit: fb60161) at 2026-04-21T20:17:28.393531+00:00
 
 ## Safety Threshold Breaches
 - Breach: ['max_pending_reviews'] at 2026-04-21T20:06:18.332078+00:00
