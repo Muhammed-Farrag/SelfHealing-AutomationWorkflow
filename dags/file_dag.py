@@ -114,6 +114,7 @@ with DAG(
     /nonexistent/path/data.csv
     /nonexistent/path/data.csv
     /nonexistent/path/data.csv
+    /data/landing/input.csv
     # END PRECHECKS
 
     t_read = PythonOperator(
