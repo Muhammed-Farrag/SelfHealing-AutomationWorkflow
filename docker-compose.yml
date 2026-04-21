@@ -87,11 +87,11 @@ services:
 
   airflow-worker:
     <<: *airflow-common
-    command: bash -c "python /opt/airflow/dags/init_sample_data.py && celery --app airflow.providers.celery.executors.celery_executor.app worker"
+    command: bash -c "celery --app airflow.providers.celery.executors.celery_executor.app worker"
     healthcheck:
       test:
         - "CMD-SHELL"
-        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "$${HOSTNAME}"'
       interval: 30s
       timeout: 10s
       retries: 5
