@@ -1,0 +1,15 @@
+{
+  "failure_type": "missing_db",
+  "target_dag": "db_dag",
+  "injected_at": "2026-04-21T18:39:34.395973+00:00",
+  "env_overrides": {
+    "DB_PATH": "/tmp/nonexistent.db"
+  },
+  "signature_tokens": [
+    "OperationalError",
+    "unable to open",
+    "database"
+  ],
+  "expected_error": "OperationalError",
+  "failing_task": "read_table"
+}
