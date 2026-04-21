@@ -365,16 +365,17 @@ Generated at: {datetime.now(timezone.utc).isoformat()}
         Revert the Git commit associated with a plan_id.
         """
         audit_logs = self._load_jsonl(str(self.audit_log_path))
-        target_log = next((l for l in audit_logs if l["plan_id"] == plan_id), None)
+        # Search backwards to find the most recent entry with a commit hash
+        target_log = next((l for l in reversed(audit_logs) if l["plan_id"] == plan_id and l.get("git_commit_hash")), None)
         
         if not target_log:
-            # Maybe look in gov_logs for approval results
+            # Maybe look in gov_logs for approval results (also search backwards)
             gov_logs = self._load_jsonl(str(self.governance_log_path))
-            target_gov = next((g for g in gov_logs if g["plan_id"] == plan_id and "patch_result" in g), None)
+            target_gov = next((g for g in reversed(gov_logs) if g["plan_id"] == plan_id and g.get("patch_result", {}).get("git_commit_hash")), None)
             if target_gov:
                 commit_hash = target_gov["patch_result"].get("git_commit_hash")
             else:
-                raise ValueError(f"Plan ID {plan_id} not found in audit logs.")
+                raise ValueError(f"No applied patch with git commit found for plan {plan_id}.")
         else:
             commit_hash = target_log.get("git_commit_hash")
 
