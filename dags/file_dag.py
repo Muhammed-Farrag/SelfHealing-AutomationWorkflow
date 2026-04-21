@@ -102,6 +102,7 @@ with DAG(
 ) as dag:
     # BEGIN PRECHECKS
     # Precheck tasks can be added here for validation before main pipeline
+    /nonexistent/path/data.csv
     # END PRECHECKS
 
     t_read = PythonOperator(
