@@ -133,6 +133,7 @@ with DAG(
     # Precheck tasks can be added here for validation before main pipeline
     /tmp/nonexistent.db
     target_db
+    target_db
     # END PRECHECKS
 
     t_read = PythonOperator(
