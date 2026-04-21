@@ -1,0 +1,3 @@
+{"action": "auto_patch_paused", "reason": "Thresholds breached: max_pending_reviews", "timestamp": "2026-04-21T20:06:18.331007+00:00"}
+{"action": "threshold_breach", "timestamp": "2026-04-21T20:06:18.332078+00:00", "metrics": {"repair_success_rate": 1.0, "false_repair_rate": 0.0, "pending_reviews": 13, "breaches": ["max_pending_reviews"], "auto_patch_paused": true}}
+{"decision_id": "gov_plan_ep_038", "plan_id": "plan_ep_038", "action": "rejected", "reason": "Already fixed", "reviewer": "bot", "decided_at": "2026-04-21T20:06:40.273375+00:00"}

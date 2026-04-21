@@ -1031,8 +1031,7 @@ def _show_audit_log(audit_log_path: str) -> None:
                     f"[{status_color}]{status}[/{status_color}]",
                     str(applied),
                     str(failed),
-                    commit[:7] if commit != "—" else "—",
-                )
+                    commit[:7] if commit and commit != "—" else "—",                )
 
             except json.JSONDecodeError:
                 pass

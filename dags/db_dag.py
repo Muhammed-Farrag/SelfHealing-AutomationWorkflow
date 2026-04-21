@@ -131,18 +131,7 @@ with DAG(
 ) as dag:
     # BEGIN PRECHECKS
     # Precheck tasks can be added here for validation before main pipeline
-    /tmp/nonexistent.db
-    target_db
-    target_db
-    /tmp/nonexistent.db
-    target_db
-    /tmp/nonexistent.db
-    /tmp/nonexistent.db
-    /tmp/nonexistent.db
-    /tmp/nonexistent.db
-    target_db
-    /tmp/nonexistent.db
-    /tmp/nonexistent.db
+    check_for_required_columns
     # END PRECHECKS
 
     t_read = PythonOperator(

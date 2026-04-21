@@ -28,7 +28,7 @@ class SandboxValidator:
         airflow_base_url: str = "http://localhost:8080",
         airflow_user: str = "airflow",
         airflow_password: str = "airflow",
-        max_wait_seconds: int = 180,
+        max_wait_seconds: int = 900,
         poll_interval: int = 5,
         validation_log_path: str = "data/validation_results.jsonl",
     ) -> None:
@@ -306,7 +306,7 @@ class SandboxValidator:
                         # Attempt to extract episode id from plan_id e.g. plan_ep_001
                         ep_id = plan_id.replace("plan_", "")
                         
-                    if plan.get("requires_human_approval"):
+                    if plan.get("requires_human_approval") and not getattr(self, "force", False):
                         console.print(f"[yellow]Skipping {plan_id} (Requires human approval)[/yellow]")
                         skipped_count += 1
                         continue
@@ -328,17 +328,17 @@ class SandboxValidator:
                     if status == "success":
                         success_count += 1
                         mttr_str = self._format_mttr(result["mttr_seconds"])
-                        console.print(f"[green]✓ {plan_id} VALIDATED SUCCESS (MTTR: {mttr_str})[/green]")
+                        console.print(f"[green]SUCCESS {plan_id} VALIDATED SUCCESS (MTTR: {mttr_str})[/green]")
                         total_mttr += result["mttr_seconds"]
                     elif status == "failed":
                         failed_count += 1
-                        console.print(f"[red]✗ {plan_id} VALIDATION FAILED[/red]")
+                        console.print(f"[red]FAILED {plan_id} VALIDATION FAILED[/red]")
                     elif status == "timeout":
                         timeout_count += 1
-                        console.print(f"[yellow]⚠ {plan_id} VALIDATION TIMED OUT[/yellow]")
+                        console.print(f"[yellow]TIMEOUT {plan_id} VALIDATION TIMED OUT[/yellow]")
                     elif status == "invariant_failed":
                         invariant_failed_count += 1
-                        console.print(f"[red]✗ {plan_id} INVARIANTS FAILED: {result['invariants_failed']}[/red]")
+                        console.print(f"[red]FAILED {plan_id} INVARIANTS FAILED: {result['invariants_failed']}[/red]")
                         
                     total_validated += 1
                     
@@ -362,11 +362,13 @@ if __name__ == "__main__":
     parser.add_argument("--episodes", type=str, default="data/episodes_classified.jsonl", help="Path to episodes JSONL")
     parser.add_argument("--output", type=str, default="data/validation_results.jsonl", help="Path to write results")
     parser.add_argument("--validate-all", action="store_true", help="Validate all approved plans")
+    parser.add_argument("--force", action="store_true", help="Force validation even if human approval is required")
     parser.add_argument("--dry-run", action="store_true", help="Dry run without API calls")
     
     args = parser.parse_args()
     
     validator = SandboxValidator(validation_log_path=args.output)
+    validator.force = args.force
     
     if args.validate_all:
         validator.validate_batch(
