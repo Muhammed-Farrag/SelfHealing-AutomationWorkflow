@@ -1,11 +1,10 @@
 import json
+import argparse
+import sys
 from pathlib import Path
 from playbook.retriever import PlaybookRetriever
 
-def enrich():
-    input_path = "data/parsed_logs.jsonl"
-    output_path = "data/episodes_enriched.jsonl"
-    
+def enrich(input_path: str, output_path: str):
     retriever = PlaybookRetriever()
     
     if not Path(input_path).exists():
@@ -29,4 +28,14 @@ def enrich():
     print(f"✓ Enriched {len(enriched_records)} episodes -> {output_path}")
 
 if __name__ == "__main__":
-    enrich()
+    parser = argparse.ArgumentParser(description="Enrich failure episodes with playbook SOPs.")
+    parser.add_argument("--episodes", type=str, default="data/parsed_logs.jsonl")
+    parser.add_argument("--out", type=str, default="data/episodes_enriched.jsonl")
+    parser.add_argument("--single", type=str, help="Legacy compatibility flag", default=None)
+    
+    args = parser.parse_args()
+    
+    # If the dashboard used --single as a positional-like flag
+    input_file = args.single if args.single else args.episodes
+    
+    enrich(input_file, args.out)

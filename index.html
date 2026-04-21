@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self-Healing Workflow AI | Autonomous Pipeline</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #0f1117;
+            --bg-card: rgba(255, 255, 255, 0.04);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(0, 212, 170, 0.4);
+            --accent-teal: #00d4aa;
+            --accent-amber: #f59e0b;
+            --accent-red: #e05252;
+            --accent-purple: #8b5cf6;
+            --accent-green: #22c55e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #475569;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-body: 'Inter', sans-serif;
+            --radius: 12px;
+            --radius-sm: 6px;
+            --shadow: 0 0 40px rgba(0, 212, 170, 0.05);
+            --glow: 0 0 20px rgba(0, 212, 170, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Scanline Overlay */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.1;
+        }
+
+        /* Typography */
+        h1, h2, h3, .mono {
+            font-family: var(--font-mono);
+            letter-spacing: -0.02em;
+        }
+
+        .label {
+            color: var(--accent-teal);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        section {
+            padding: 100px 0;
+            position: relative;
+        }
+
+        /* Navbar */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            padding: 1.5rem 0;
+        }
+
+        nav.scrolled {
+            padding: 1rem 0;
+            backdrop-filter: blur(20px);
+            background: rgba(10, 10, 15, 0.8);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: var(--font-mono);
+            color: var(--accent-teal);
+            font-size: 1.25rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-teal);
+        }
+
+        .btn-outline {
+            border: 1px solid var(--accent-teal);
+            color: var(--accent-teal);
+            padding: 0.6rem 1.2rem;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .btn-outline:hover {
+            background: rgba(0, 212, 170, 0.1);
+            box-shadow: var(--glow);
+        }
+
+        .btn-solid {
+            background: var(--accent-teal);
+            color: var(--bg-primary);
+            padding: 0.8rem 1.8rem;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+
+        .btn-solid:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--glow);
+        }
+
+        /* Hero */
+        #hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            padding-top: 80px;
+            overflow: hidden;
+        }
+
+        #particle-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .hero-content {
+            max-width: 800px;
+        }
+
+        .hero-content h1 {
+            font-size: 4.5rem;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero-content p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+        }
+
+        .pill-container {
+            display: flex;
+            gap: 1rem;
+            margin-top: 4rem;
+        }
+
+        .pill {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 100px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Problem Section */
+        .problem-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .comparison-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            border-radius: var(--radius);
+            padding: 2.5rem;
+        }
+
+        .comparison-row {
+            margin-bottom: 2rem;
+        }
+
+        .comparison-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .comp-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        .indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot.red { background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+        .dot.teal { background: var(--accent-teal); box-shadow: 0 0 10px var(--accent-teal); }
+
+        /* Architecture Diagram */
+        .arch-diagram {
+            margin-top: 4rem;
+            overflow-x: auto;
+            padding-bottom: 2rem;
+        }
+
+        .pipeline {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            min-width: 1100px;
+            padding: 40px;
+        }
+
+        .node {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.2rem;
+            width: 180px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .node:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-5px);
+        }
+
+        .node.active {
+            border-color: var(--accent-teal);
+            background: rgba(0, 212, 170, 0.05);
+            box-shadow: var(--shadow);
+        }
+
+        .node-icon { font-size: 1.5rem; margin-bottom: 0.75rem; display: block; }
+        .node-name { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 0.25rem; }
+        .node-sub { font-size: 0.7rem; color: var(--text-secondary); display: block; }
+
+        .arrow {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        .branch {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+        }
+
+        .branch-line {
+            position: absolute;
+            right: -25px;
+            top: 50%;
+            height: 2px;
+            background: var(--text-muted);
+            width: 20px;
+        }
+
+        .detail-panel {
+            margin-top: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2.5rem;
+            min-height: 200px;
+            display: none;
+            animation: fadeIn 0.4s easeOut;
+        }
+
+        .detail-panel.visible { display: block; }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 2fr 3fr;
+            gap: 3rem;
+        }
+
+        .detail-meta p { font-size: 0.9rem; margin-bottom: 1rem; }
+        .detail-meta span { color: var(--accent-teal); font-family: var(--font-mono); }
+
+        /* Pulsing Ring for Safety Gate */
+        .pulse-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: var(--radius);
+            border: 2px solid var(--accent-amber);
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+        }
+
+        .node[data-id="8"].active .pulse-ring {
+            display: block;
+            animation: pulse-amber 2s infinite;
+        }
+
+        @keyframes pulse-amber {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+            100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0; }
+        }
+
+        /* Failure Classes */
+        .failure-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .failure-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            transition: border-color 0.2s;
+        }
+
+        .failure-card:hover { border-color: var(--border-hover); }
+
+        .f-icon { font-size: 2rem; margin-bottom: 1.5rem; display: block; }
+        .f-title { font-family: var(--font-mono); margin-bottom: 0.5rem; }
+        .f-tag { font-size: 0.7rem; color: var(--accent-teal); font-family: var(--font-mono); margin-bottom: 1rem; display: block; }
+        .f-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; height: 3.6rem; overflow: hidden; }
+        .f-repair { font-size: 0.8rem; border-top: 1px solid var(--border); padding-top: 1rem; color: var(--text-muted); }
+
+        /* Metrics */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        .metric-item { text-align: center; }
+        .metric-value { font-size: 3.5rem; font-family: var(--font-mono); color: var(--accent-teal); display: block; line-height: 1; margin-bottom: 0.5rem; }
+        .metric-label { color: var(--text-secondary); text-transform: uppercase; font-size: 0.8rem; font-family: var(--font-mono); }
+
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 3rem;
+            border-radius: var(--radius);
+        }
+
+        .chart-row {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .chart-label { width: 120px; font-family: var(--font-mono); font-size: 0.8rem; }
+        .bar-container { flex-grow: 1; height: 12px; background: rgba(255,255,255,0.05); border-radius: 100px; overflow: hidden; }
+        .bar { height: 100%; width: 0%; transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 100px; }
+
+        .code-block {
+            margin-top: 3rem;
+            background: #050508;
+            padding: 2rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: #d1d5db;
+            overflow-x: auto;
+        }
+
+        /* Tech Stack */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .tech-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.2s;
+        }
+
+        .tech-badge:hover { border-color: var(--accent-teal); transform: translateX(5px); }
+        .tech-name { font-family: var(--font-mono); font-size: 0.9rem; }
+        .tech-role { font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Animation utilities */
+        [data-animate] {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        [data-animate].visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-content h1 { font-size: 3rem; }
+            .problem-grid { grid-template-columns: 1fr; gap: 2rem; }
+            .pipeline { flex-direction: column; min-width: auto; padding: 0; gap: 40px; }
+            .node { width: 100%; max-width: 300px; }
+            .arrow { transform: rotate(90deg); }
+            .detail-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+            .metric-grid { grid-template-columns: 1fr; }
+            .tech-grid { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav id="navbar">
+        <div class="container nav-content">
+            <a href="#" class="logo">⬡ SH-AI</a>
+            <div class="nav-links">
+                <a href="#architecture">Architecture</a>
+                <a href="#pipeline">Pipeline</a>
+                <a href="#dataset">Dataset</a>
+                <a href="https://github.com/Muhammed-Farrag/SelfHealing-AutomationWorkflow" class="btn-outline">View on GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <canvas id="particle-canvas"></canvas>
+
+    <section id="hero">
+        <div class="container">
+            <div class="hero-content">
+                <span class="label" data-animate>// Autonomous Infrastructure</span>
+                <h1 data-animate style="transition-delay: 100ms;">Self-Healing Workflow AI</h1>
+                <p data-animate style="transition-delay: 200ms;">Automated failure detection, diagnosis, and repair for Apache Airflow pipelines — powered by ML classifiers, RAG retrieval, and constrained LLM planning.</p>
+                <div data-animate style="transition-delay: 300ms;">
+                    <a href="#arch-interaction" class="btn-solid">Explore Architecture →</a>
+                </div>
+                <div class="pill-container" data-animate style="transition-delay: 400ms;">
+                    <div class="pill">60 Failure Episodes</div>
+                    <div class="pill">5 Failure Classes</div>
+                    <div class="pill">>99% Classifier Accuracy</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="problem">
+        <div class="container">
+            <span class="label" data-animate>// 01 PROBLEM</span>
+            <div class="problem-grid">
+                <div data-animate>
+                    <h2>Why pipelines stay broken</h2>
+                    <p style="margin-top: 1.5rem; color: var(--text-secondary);">Production Airflow failures are notoriously manual to fix. When a DAG fails, engineers spend hours digging through logs, guessing root causes, and manually patching code. MTTR is high, SLAs are missed, and repetitive issues drain engineering resources.</p>
+                </div>
+                <div class="comparison-card" data-animate style="transition-delay: 200ms;">
+                    <div class="comparison-row">
+                        <div class="comp-title">Traditional Manual Response</div>
+                        <div class="indicator"><div class="dot red"></div> Manual inspection</div>
+                        <div class="indicator"><div class="dot red"></div> Guessing root cause</div>
+                        <div class="indicator"><div class="dot red"></div> ~45min MTTR</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-title">Autonomous Self-Healing</div>
+                        <div class="indicator"><div class="dot teal"></div> Auto-detection & ML Class</div>
+                        <div class="indicator"><div class="dot teal"></div> RAG-based Repair</div>
+                        <div class="indicator"><div class="dot teal"></div> &lt;5min MTTR</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="architecture">
+        <div class="container">
+            <span class="label" data-animate>// 02 ARCHITECTURE</span>
+            <h2 data-animate>The self-healing pipeline</h2>
+            
+            <div id="arch-interaction" class="arch-diagram" data-animate style="transition-delay: 100ms;">
+                <div class="pipeline">
+                    <div class="node active" data-id="1">
+                        <span class="node-icon">🌬️</span>
+                        <span class="node-name">Airflow DAGs</span>
+                        <span class="node-sub">3 injectable DAGs</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="2">
+                        <span class="node-icon">🔥</span>
+                        <span class="node-name">Failure Injector</span>
+                        <span class="node-sub">5 types via .env</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="3">
+                        <span class="node-icon">📋</span>
+                        <span class="node-name">Episode Gen</span>
+                        <span class="node-sub">60 JSONL records</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="4">
+                        <span class="node-icon">🧬</span>
+                        <span class="node-name">Drain Parser</span>
+                        <span class="node-sub">log templates</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="5">
+                        <span class="node-icon">🤖</span>
+                        <span class="node-name">ML Classifier</span>
+                        <span class="node-sub">TF-IDF + LogReg</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="6">
+                        <span class="node-icon">🔍</span>
+                        <span class="node-name">FAISS Retriever</span>
+                        <span class="node-sub">semantic search</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="7">
+                        <span class="node-icon">🧠</span>
+                        <span class="node-name">LLM Planner</span>
+                        <span class="node-sub">JSON schema</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="8" style="border-color: var(--accent-amber);">
+                        <div class="pulse-ring"></div>
+                        <span class="node-icon">🛡️</span>
+                        <span class="node-name">Safety Gate</span>
+                        <span class="node-sub">human approval</span>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="node" data-id="9" style="border-color: var(--accent-green);">
+                        <span class="node-icon">⚙️</span>
+                        <span class="node-name">Patch Applier</span>
+                        <span class="node-sub">git + audit log</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="node-detail" class="detail-panel visible" data-animate style="transition-delay: 200ms;">
+                <div class="detail-grid">
+                    <div class="detail-meta">
+                        <h3 id="panel-title">Airflow DAGs</h3>
+                        <p>File: <span id="panel-file">dags/http_dag.py · dags/db_dag.py · dags/file_dag.py</span></p>
+                        <hr style="border:0; border-top:1px solid var(--border); margin: 1.5rem 0;">
+                        <p>Input: <span id="panel-input">Environment variables (API_URL, DB_PATH, etc.)</span></p>
+                        <p>Output: <span id="panel-output">Task execution logs via REST API</span></p>
+                    </div>
+                    <div class="detail-body">
+                        <p id="panel-desc">Three injectable Apache Airflow DAGs performing HTTP ETL, SQLite DB reads, and file processing. All configuration is read from os.environ so failures can be injected without touching DAG code.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="pipeline">
+        <div class="container">
+            <span class="label" data-animate>// 03 FAILURE TAXONOMY</span>
+            <h2 data-animate>5 failure classes, fully labeled</h2>
+            <div class="failure-grid" style="margin-top: 3rem;">
+                <div class="failure-card" data-animate>
+                    <span class="f-icon">⏱</span>
+                    <h3 class="f-title">timeout</h3>
+                    <span class="f-tag">DAG: http_dag</span>
+                    <p class="f-desc">ReadTimeout: HTTPSConnectionPool(host='httpbin.org', port=443): Read timed out.</p>
+                    <div class="f-repair">Repair: Increase API_TIMEOUT</div>
+                </div>
+                <div class="failure-card" data-animate style="transition-delay: 100ms;">
+                    <span class="f-icon">🌐</span>
+                    <h3 class="f-title">http_error</h3>
+                    <span class="f-tag">DAG: http_dag</span>
+                    <p class="f-desc">HTTPError: 404 Client Error: Not Found for url: https://httpbin.org/status/404</p>
+                    <div class="f-repair" style="border-color: var(--accent-red);">Repair: Fix API_URL</div>
+                </div>
+                <div class="failure-card" data-animate style="transition-delay: 200ms;">
+                    <span class="f-icon">📂</span>
+                    <h3 class="f-title">missing_file</h3>
+                    <span class="f-tag">DAG: file_dag</span>
+                    <p class="f-desc">FileNotFoundError: [Errno 2] No such file or directory: '/nonexistent/path/data.csv'</p>
+                    <div class="f-repair">Repair: replace_path</div>
+                </div>
+                <div class="failure-card" data-animate style="transition-delay: 300ms;">
+                    <span class="f-icon">🗃</span>
+                    <h3 class="f-title">missing_column</h3>
+                    <span class="f-tag">DAG: db_dag</span>
+                    <p class="f-desc">KeyError: 'nonexistent_column' in processed results.</p>
+                    <div class="f-repair">Repair: set_env column override</div>
+                </div>
+                <div class="failure-card" data-animate style="transition-delay: 400ms;">
+                    <span class="f-icon">🗄</span>
+                    <h3 class="f-title">missing_db</h3>
+                    <span class="f-tag">DAG: db_dag</span>
+                    <p class="f-desc">OperationalError: unable to open database file: /tmp/nonexistent.db</p>
+                    <div class="f-repair" style="border-color: var(--accent-red);">Repair: fix DB_PATH</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="dataset">
+        <div class="container">
+            <span class="label" data-animate>// 04 DATASET & METRICS</span>
+            <h2 data-animate>Reproducible evaluation benchmark</h2>
+            
+            <div class="metric-grid" style="margin-top: 4rem;">
+                <div class="metric-item">
+                    <span class="metric-value" data-count="60">0</span>
+                    <span class="metric-label">Episodes Generated</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-value" data-count="5">0</span>
+                    <span class="metric-label">Failure Classes</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-value" data-count="99">0</span>
+                    <span class="metric-label">% Classifier Accuracy</span>
+                </div>
+            </div>
+
+            <div class="chart-container" data-animate>
+                <div class="chart-row">
+                    <div class="chart-label">timeout</div>
+                    <div class="bar-container"><div class="bar" style="background: var(--accent-teal);" data-width="20%"></div></div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-label">http_error</div>
+                    <div class="bar-container"><div class="bar" style="background: var(--accent-red);" data-width="20%"></div></div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-label">missing_file</div>
+                    <div class="bar-container"><div class="bar" style="background: var(--accent-amber);" data-width="20%"></div></div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-label">missing_column</div>
+                    <div class="bar-container"><div class="bar" style="background: var(--accent-purple);" data-width="20%"></div></div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-label">missing_db</div>
+                    <div class="bar-container"><div class="bar" style="background: var(--accent-green);" data-width="20%"></div></div>
+                </div>
+            </div>
+
+<div class="code-block" data-animate style="transition-delay: 200ms;">
+<pre>{
+  "episode_id": "ep_001",
+  "dag_id": "http_dag",
+  "task_id": "extract_api",
+  "failure_type": "timeout",
+  "failure_class": "timeout",
+  "log_excerpt": "ReadTimeout: HTTPSConnectionPool...",
+  "template": "ReadTimeout <*> HTTPSConnectionPool <*>",
+  "event_id": "a3f2b91c",
+  "ml_confidence": 0.97
+}</pre>
+</div>
+        </div>
+    </section>
+
+    <section id="techstack">
+        <div class="container">
+            <span class="label" data-animate>// 05 TECH STACK</span>
+            <h2 data-animate>Built with</h2>
+            <div class="tech-grid" style="margin-top: 3rem;">
+                <div class="tech-badge" data-animate>
+                    <span>🌬️</span>
+                    <div>
+                        <div class="tech-name">Apache Airflow</div>
+                        <div class="tech-role">Workflow Orchestrator</div>
+                    </div>
+                </div>
+                <div class="tech-badge" data-animate>
+                    <span>🐍</span>
+                    <div>
+                        <div class="tech-name">Python 3.10+</div>
+                        <div class="tech-role">Core Language</div>
+                    </div>
+                </div>
+                <div class="tech-badge" data-animate>
+                    <span>🤗</span>
+                    <div>
+                        <div class="tech-name">SentenceTransformers</div>
+                        <div class="tech-role">Playbook Embedding</div>
+                    </div>
+                </div>
+                <div class="tech-badge" data-animate>
+                    <span>🔎</span>
+                    <div>
+                        <div class="tech-name">FAISS</div>
+                        <div class="tech-role">Vector Similarity Search</div>
+                    </div>
+                </div>
+                <div class="tech-badge" data-animate>
+                    <span>🧮</span>
+                    <div>
+                        <div class="tech-name">scikit-learn</div>
+                        <div class="tech-role">ML Classification</div>
+                    </div>
+                </div>
+                <div class="tech-badge" data-animate>
+                    <span>🔗</span>
+                    <div>
+                        <div class="tech-name">Groq / OpenAI</div>
+                        <div class="tech-role">LLM Repair Planning</div>
+                    </div>
+                </div>
+                <div class="tech-badge" data-animate>
+                    <span>🐙</span>
+                    <div>
+                        <div class="tech-name">Git</div>
+                        <div class="tech-role">Patch Versioning</div>
+                    </div>
+                </div>
+                <div class="tech-badge" data-animate>
+                    <span>🐳</span>
+                    <div>
+                        <div class="tech-name">Docker</div>
+                        <div class="tech-role">Local Deployment</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // --- Particle System ---
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        const particleCount = 60;
+        const connectionDistance = 120;
+
+        function initParticles() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5
+                });
+            }
+        }
+
+        function drawParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(0, 212, 170, 0.4)';
+            ctx.strokeStyle = 'rgba(0, 212, 170, 0.1)';
+
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                for (let j = i + 1; j < particles.length; j++) {
+                    let p2 = particles[j];
+                    let dx = p.x - p2.x;
+                    let dy = p.y - p2.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < connectionDistance) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(drawParticles);
+        }
+
+        window.addEventListener('resize', initParticles);
+        initParticles();
+        drawParticles();
+
+        // --- Navbar Scroll Logic ---
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        });
+
+        // --- Intersection Observer for Animations ---
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    
+                    // Trigger count animation
+                    if (entry.target.classList.contains('metric-item')) {
+                        const countEl = entry.target.querySelector('.metric-value');
+                        const target = parseInt(countEl.getAttribute('data-count'));
+                        animateCount(countEl, target);
+                    }
+                    
+                    // Trigger bar animation
+                    if (entry.target.classList.contains('chart-container')) {
+                        const bars = entry.target.querySelectorAll('.bar');
+                        bars.forEach(bar => {
+                            bar.style.width = bar.getAttribute('data-width');
+                        });
+                    }
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('[data-animate], .metric-item, .chart-container').forEach(el => observer.observe(el));
+
+        function animateCount(el, target) {
+            let current = 0;
+            const step = target / 40;
+            const interval = setInterval(() => {
+                current += step;
+                if (current >= target) {
+                    el.innerText = target + (target === 99 ? '%' : '');
+                    clearInterval(interval);
+                } else {
+                    el.innerText = Math.floor(current);
+                }
+            }, 30);
+        }
+
+        // --- Architecture Logic ---
+        const nodes = document.querySelectorAll('.node');
+        const detailPanel = document.getElementById('node-detail');
+        const nodeData = {
+            1: {
+                title: "Airflow DAGs",
+                file: "dags/http_dag.py · dags/db_dag.py · dags/file_dag.py",
+                input: "Environment variables (API_URL, DB_PATH, etc.)",
+                output: "Task execution logs via REST API",
+                desc: "Three injectable Apache Airflow DAGs performing HTTP ETL, SQLite DB reads, and file processing. All configuration is read from os.environ so failures can be injected without touching DAG code."
+            },
+            2: {
+                title: "Failure Injector",
+                file: "failure_injection/injector.py",
+                input: "failure_type (str), target_dag (str)",
+                output: ".env.inject override file · injection_state.json",
+                desc: "Injects exactly 5 failure types by writing env overrides to .env.inject. Records injection metadata to injection_state.json with ISO timestamps and log signature tokens."
+            },
+            3: {
+                title: "Episode Generator",
+                file: "episode_generator/generate_episodes.py",
+                input: "Airflow REST API · .env.inject",
+                output: "data/episodes_raw.jsonl (60 records)",
+                desc: "Orchestrates 60 failure episodes (5 types × 12 seeds). Triggers each DAG via the Airflow REST API, polls until terminal state, collects task logs, and writes a JSONL record per episode."
+            },
+            4: {
+                title: "Drain Parser",
+                file: "log_parser/drain_parser.py",
+                input: "log_excerpt (raw log text)",
+                output: "template (str) · event_id (8-char hex)",
+                desc: "Implements the Drain fixed-depth prefix tree algorithm to cluster raw log lines into stable templates. Produces a deterministic event_id per cluster via MD5 hashing."
+            },
+            5: {
+                title: "ML Classifier",
+                file: "classifier/ml_classifier.py · classifier/classifier.py",
+                input: "log_excerpt + event_id",
+                output: "failure_class · confidence",
+                desc: "Two-stage classification. First a regex-based classifier applies ordered rules. Then a TF-IDF + Logistic Regression model augments classification with confidence scores."
+            },
+            6: {
+                title: "FAISS Retriever",
+                file: "playbook/retriever.py · playbook/repair_playbook.yaml",
+                input: "failure context (query string + failure_class)",
+                output: "top-K playbook entries with similarity scores",
+                desc: "Embeds playbook entries using SentenceTransformers and indexes them in a FAISS FlatIP index. Retrieves top-K most semantically similar repair SOPs."
+            },
+            7: {
+                title: "LLM Repair Planner",
+                file: "planner/repair_planner.py",
+                input: "episode dict + retrieved playbook entries",
+                output: "validated RepairPlan JSON",
+                desc: "Constructs a structured prompt and calls GPT-4o (or local Llama3) with strict JSON-only requirements. Validates the response against a JSON schema."
+            },
+            8: {
+                title: "Safety Gate",
+                file: "Built into patch_applier.py",
+                input: "RepairPlan dict",
+                output: "Approved → Patch Applier · Blocked → Human Review",
+                desc: "Blocks any RepairPlan with requires_human_approval=true or confidence < 0.5. All repair_actions must use only the 5 allowed operators."
+            },
+            9: {
+                title: "Patch Applier",
+                file: "patcher/patch_applier.py",
+                input: "approved RepairPlan · project files",
+                output: ".env.inject · patched dags/*.py · git commit",
+                desc: "Applies approved repair actions to .env.inject and dags/*.py using strict regex patterns. Creates a git commit per applied plan for full rollback capability."
+            }
+        };
+
+        nodes.forEach(node => {
+            node.addEventListener('click', () => {
+                const id = node.getAttribute('data-id');
+                
+                // Active state toggle
+                nodes.forEach(n => n.classList.remove('active'));
+                node.classList.add('active');
+                
+                // Update detail board
+                const data = nodeData[id];
+                document.getElementById('panel-title').innerText = data.title;
+                document.getElementById('panel-file').innerText = data.file;
+                document.getElementById('panel-input').innerText = data.input;
+                document.getElementById('panel-output').innerText = data.output;
+                document.getElementById('panel-desc').innerText = data.desc;
+                
+                // Add a little pop effect
+                detailPanel.style.display = 'none';
+                void detailPanel.offsetWidth; // trigger reflow
+                detailPanel.style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>
