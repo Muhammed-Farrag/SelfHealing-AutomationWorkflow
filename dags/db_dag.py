@@ -135,6 +135,7 @@ with DAG(
     target_db
     target_db
     /tmp/nonexistent.db
+    target_db
     # END PRECHECKS
 
     t_read = PythonOperator(
