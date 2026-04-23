@@ -22,7 +22,7 @@ import requests
 # Default arguments for all tasks in this DAG
 default_args = {
     "owner": "airflow",
-    "retries": 5,
+    "retries": 3,
 }
 
 
