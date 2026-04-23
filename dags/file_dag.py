@@ -110,6 +110,7 @@ with DAG(
     /nonexistent/path/data.csv
     /nonexistent/path/data.csv
     /nonexistent/path/data.csv
+    /nonexistent/path/data.csv
     # END PRECHECKS
 
     t_read = PythonOperator(
