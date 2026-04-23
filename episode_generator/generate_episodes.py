@@ -27,6 +27,9 @@ from typing import Any
 import requests
 from requests.auth import HTTPBasicAuth
 
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 # Add project root to path for imports
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))

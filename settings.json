@@ -1,0 +1,8 @@
+{
+  "confidence_threshold": 0.5,
+  "auto_patch_threshold": 0.8,
+  "require_human_below": 0.5,
+  "auto_patch_enabled": true,
+  "dry_run_mode": false,
+  "audit_logging": true
+}
