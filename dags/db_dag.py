@@ -134,6 +134,7 @@ with DAG(
     check_for_required_columns
     /tmp/nonexistent.db
     target_db
+    target_db
     # END PRECHECKS
 
     t_read = PythonOperator(
