@@ -167,12 +167,83 @@ class ValidationRequest(BaseModel):
 # EXISTING ENDPOINTS (preserved)
 # ═══════════════════════════════════════════════════
 
-@app.get("/api/episodes", tags=["Data Retrieval"], response_model=List[EpisodeRecord])
+@app.get("/api/episodes", tags=["Data Retrieval"])
 def get_episodes():
-    """Retrieve all available failure episodes."""
+    """Retrieve all episodes enriched with plan status, confidence, and repair details."""
     if not EPISODES_FILE.exists():
         raise HTTPException(status_code=404, detail="Data file not found")
-    return read_jsonl(EPISODES_FILE)
+
+    episodes = read_jsonl(EPISODES_FILE)
+    plans = read_jsonl(REPAIR_PLANS_FILE)
+    audit_entries = read_jsonl(AUDIT_LOG_FILE)
+
+    # Build lookups keyed by episode_id
+    # plan_id follows pattern: "plan_ep_001" → episode "ep_001"
+    plan_by_ep: Dict[str, Dict] = {}
+    for p in plans:
+        pid = p.get("plan_id", "")
+        # derive episode_id: plan_ep_001 → ep_001, plan_ep_01 → ep_01
+        ep_id = pid.replace("plan_", "", 1)  # plan_ep_001 → ep_001
+        plan_by_ep[ep_id] = p
+
+    # Audit gives the authoritative final status per plan
+    audit_status_by_plan: Dict[str, str] = {}
+    for a in audit_entries:
+        pid = a.get("plan_id", "")
+        if pid:
+            audit_status_by_plan[pid] = a.get("status", "unknown")
+
+    enriched = []
+    for ep in episodes:
+        ep_id = ep.get("episode_id", "")
+        plan = plan_by_ep.get(ep_id, {})
+        plan_id = plan.get("plan_id", "")
+
+        # Determine status: audit wins → plan.status → "pending" (has plan) → "unclassified"
+        if plan_id and plan_id in audit_status_by_plan:
+            status = audit_status_by_plan[plan_id]
+        elif plan.get("status"):
+            status = plan["status"]
+        elif plan_id:
+            status = "pending"
+        else:
+            status = "unclassified"
+
+        # Derive failure_class: plan wins over episode raw field
+        failure_class = (
+            plan.get("failure_class")
+            or ep.get("failure_class")
+            or ep.get("failure_type")
+            or "unknown"
+        )
+
+        # Playbook matches from plan or episode
+        playbook_matches = (
+            ep.get("retrieved_playbook_entries")
+            or plan.get("retrieved_playbook_entries")
+            or []
+        )
+
+        enriched.append({
+            **ep,
+            "failure_class": failure_class,
+            "status": status,
+            "plan_id": plan_id,
+            # Plan fields surfaced at episode level for the detail panel
+            "confidence": plan.get("confidence", 0.0),
+            "ml_confidence": plan.get("confidence", ep.get("ml_confidence", 0.0)),
+            "reasoning": plan.get("reasoning", ""),
+            "repair_actions": plan.get("repair_actions", []),
+            "requires_human_approval": plan.get("requires_human_approval", False),
+            "fallback_action": plan.get("fallback_action", ""),
+            "playbook_matches": playbook_matches,
+            # Classifier agreement fields
+            "regex_class": ep.get("failure_type", failure_class),
+            "ml_class": failure_class,
+            "classifiers_agree": ep.get("failure_type", "") == failure_class,
+        })
+
+    return enriched
 
 
 @app.post("/api/classify", tags=["Diagnostics"], response_model=DashboardLegacyResponse)

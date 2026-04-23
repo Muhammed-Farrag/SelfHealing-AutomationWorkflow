@@ -24,16 +24,19 @@ const FAILURE_CLASS_LABELS: Record<string, string> = {
 };
 
 export function StatusBadge({ type, value, size = 'sm' }: StatusBadgeProps) {
+  // Guard: real API data may return null/undefined for optional fields
+  const safeValue = value ?? '';
+
   let color: string;
   let label: string;
 
   if (type === 'status') {
-    const cfg = STATUS_CONFIG[value] || { color: '#4a5a6a', label: value.toUpperCase() };
+    const cfg = STATUS_CONFIG[safeValue] || { color: '#4a5a6a', label: safeValue ? safeValue.toUpperCase() : '—' };
     color = cfg.color;
     label = cfg.label;
   } else {
-    color = FAILURE_CLASS_COLORS[value as FailureClass] || '#4a5a6a';
-    label = FAILURE_CLASS_LABELS[value] || value.toUpperCase();
+    color = FAILURE_CLASS_COLORS[safeValue as FailureClass] || '#4a5a6a';
+    label = FAILURE_CLASS_LABELS[safeValue] || (safeValue ? safeValue.toUpperCase() : '—');
   }
 
   const padding = size === 'sm' ? '2px 8px' : '4px 12px';

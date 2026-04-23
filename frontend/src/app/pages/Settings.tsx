@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export function Settings() {
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.50);
@@ -43,9 +43,35 @@ export function Settings() {
     return '•'.repeat(key.length - 4) + key.slice(-4);
   };
 
-  const handleSave = () => {
-    showToast('CONFIGURATION SAVED — changes applied immediately');
+  const handleSave = async () => {
+    try {
+      const res = await fetch('/api/settings/thresholds', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confidence_threshold: confidenceThreshold,
+          auto_patch_threshold: highConfidenceAutoApply,
+          require_human_below: requireHumanThreshold,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast('✓ CONFIGURATION SAVED — thresholds persisted to backend');
+    } catch (e: any) {
+      showToast(`⚠ SAVE FAILED: ${e.message}`);
+    }
   };
+
+  // Load real thresholds on mount
+  useEffect(() => {
+    fetch('/api/settings/thresholds').then(r => r.json()).then(s => {
+      if (s.confidence_threshold !== undefined) setConfidenceThreshold(s.confidence_threshold);
+      if (s.auto_patch_threshold !== undefined) setHighConfidenceAutoApply(s.auto_patch_threshold);
+      if (s.require_human_below !== undefined) setRequireHumanThreshold(s.require_human_below);
+      if (s.auto_patch_enabled !== undefined) setAutoPatchEnabled(s.auto_patch_enabled);
+      if (s.dry_run_mode !== undefined) setDryRunMode(s.dry_run_mode);
+      if (s.audit_logging !== undefined) setAuditLogging(s.audit_logging);
+    }).catch(() => {});
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720 }}>

@@ -8,20 +8,33 @@ import { AuditTrail } from './pages/AuditTrail';
 import { Rollback } from './pages/Rollback';
 import { Intelligence } from './pages/Intelligence';
 import { Settings } from './pages/Settings';
+import { PageErrorBoundary } from './components/PageErrorBoundary';
+import React from 'react';
+
+/** Wraps a page component with a PageErrorBoundary scoped to that page's name. */
+function withBoundary(Component: React.ComponentType, name: string) {
+  return function BoundedPage() {
+    return (
+      <PageErrorBoundary pageName={name}>
+        <Component />
+      </PageErrorBoundary>
+    );
+  };
+}
 
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: Root,
     children: [
-      { index: true, Component: Dashboard },
-      { path: 'episodes', Component: Episodes },
-      { path: 'plans', Component: RepairPlans },
-      { path: 'review', Component: ReviewQueue },
-      { path: 'audit', Component: AuditTrail },
-      { path: 'rollback', Component: Rollback },
-      { path: 'intelligence', Component: Intelligence },
-      { path: 'settings', Component: Settings },
+      { index: true,              Component: withBoundary(Dashboard,   'Dashboard') },
+      { path: 'episodes',         Component: withBoundary(Episodes,    'Episodes') },
+      { path: 'plans',            Component: withBoundary(RepairPlans, 'Repair Plans') },
+      { path: 'review',           Component: withBoundary(ReviewQueue, 'Review Queue') },
+      { path: 'audit',            Component: withBoundary(AuditTrail,  'Audit Trail') },
+      { path: 'rollback',         Component: withBoundary(Rollback,    'Rollback') },
+      { path: 'intelligence',     Component: withBoundary(Intelligence,'Intelligence') },
+      { path: 'settings',         Component: withBoundary(Settings,    'Settings') },
     ],
   },
 ]);

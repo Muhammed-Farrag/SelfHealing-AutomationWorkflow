@@ -1,12 +1,50 @@
-import React from 'react';
-import { INTELLIGENCE_DATA, FAILURE_CLASS_DISTRIBUTION, FAILURE_CLASS_COLORS } from '../data/mockData';
+import React, { useEffect, useState } from 'react';
+
+const CLASS_COLORS: Record<string, string> = {
+  timeout: '#f59e0b',
+  http_error: '#ef4444',
+  missing_file: '#3b82f6',
+  missing_column: '#8b5cf6',
+  missing_db: '#f97316',
+};
 
 const CLASSES = ['timeout', 'http_error', 'missing_file', 'missing_column', 'missing_db'];
 
 export function Intelligence() {
-  const { testAccuracy, trainAccuracy, totalEpisodes, modelFile, classifierAgreement, confusionMatrix } = INTELLIGENCE_DATA;
-  const agreementPct = ((classifierAgreement.agreed / classifierAgreement.total) * 100).toFixed(1);
-  const totalDist = FAILURE_CLASS_DISTRIBUTION.reduce((s, d) => s + d.count, 0);
+  const [intel, setIntel] = useState<any>(null);
+  const [dashStats, setDashStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/intelligence').then(r => r.json()).catch(() => null),
+      fetch('/api/dashboard/stats').then(r => r.json()).catch(() => null),
+    ]).then(([i, d]) => {
+      setIntel(i);
+      setDashStats(d);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const metrics = intel?.metrics || {};
+  const testAccuracy = metrics.test_accuracy ?? metrics.validation_accuracy ?? 0;
+  const trainAccuracy = metrics.train_accuracy ?? 0;
+  const classReport: Record<string, any> = metrics.classification_report || {};
+  const confusionMatrix: number[][] = metrics.confusion_matrix ?? [];
+  const classifierAgreement = intel?.classifier_agreement ?? { agreed: 0, total: 0, rate: 0 };
+  const agreementPct = ((classifierAgreement.rate || 0) * 100).toFixed(1);
+
+  // Build distribution: prefer dashboard failure_distribution (episode-level counts),
+  // fall back to classification_report support (test-set counts)
+  const dashDist: Record<string, number> = dashStats?.failure_distribution || {};
+  const FAILURE_CLASS_DISTRIBUTION = CLASSES.map(cls => ({
+    class: cls,
+    color: CLASS_COLORS[cls] || '#4a5a6a',
+    count: dashDist[cls] ?? classReport[cls]?.support ?? 0,
+  }));
+  const totalDist = FAILURE_CLASS_DISTRIBUTION.reduce((s, d) => s + d.count, 0) || 1;
+  const totalEpisodes = dashStats?.total_episodes ?? classifierAgreement.total ?? 0;
+
+  if (loading) return <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#4a5a6a', padding: 32, textAlign: 'center' }}>LOADING INTELLIGENCE DATA...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -21,10 +59,10 @@ export function Intelligence() {
 
       {/* Row 1: Metric cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <MetricCard label="TEST ACCURACY" value={`${(testAccuracy * 100).toFixed(1)}%`} color="#00d4aa" />
-        <MetricCard label="TRAIN ACCURACY" value={`${(trainAccuracy * 100).toFixed(1)}%`} color="#10b981" />
-        <MetricCard label="TOTAL EPISODES" value={String(totalEpisodes)} color="#3b82f6" />
-        <MetricCard label="MODEL FILE" value={modelFile} color="#8b5cf6" sub="2.3 MB · pipeline.pkl" />
+        <MetricCard label="TEST ACCURACY" value={`${(testAccuracy * 100).toFixed(1)}%`} color="#00d4aa" sub="validation set" />
+        <MetricCard label="TRAIN ACCURACY" value={`${(trainAccuracy * 100).toFixed(1)}%`} color="#10b981" sub="training set" />
+        <MetricCard label="TOTAL EPISODES" value={String(totalEpisodes)} color="#3b82f6" sub="classified episodes" />
+        <MetricCard label="MODEL FILE" value="pipeline.pkl" color="#8b5cf6" sub={`${CLASSES.length} classes · Random Forest`} />
       </div>
 
       {/* Row 2: Confusion Matrix + Accuracy Plot */}
