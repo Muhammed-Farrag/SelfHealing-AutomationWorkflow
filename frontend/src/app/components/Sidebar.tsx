@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { label: 'Audit Trail', path: '/audit' },
   { label: 'Rollback', path: '/rollback' },
   { label: 'Intelligence', path: '/intelligence' },
+  { label: 'A/B Benchmark', path: '/benchmark' },
   { label: 'Settings', path: '/settings' },
 ];
 

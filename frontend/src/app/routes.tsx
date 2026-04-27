@@ -7,6 +7,7 @@ import { ReviewQueue } from './pages/ReviewQueue';
 import { AuditTrail } from './pages/AuditTrail';
 import { Rollback } from './pages/Rollback';
 import { Intelligence } from './pages/Intelligence';
+import { Benchmark } from './pages/Benchmark';
 import { Settings } from './pages/Settings';
 import { PageErrorBoundary } from './components/PageErrorBoundary';
 import React from 'react';
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: 'audit',            Component: withBoundary(AuditTrail,  'Audit Trail') },
       { path: 'rollback',         Component: withBoundary(Rollback,    'Rollback') },
       { path: 'intelligence',     Component: withBoundary(Intelligence,'Intelligence') },
+      { path: 'benchmark',        Component: withBoundary(Benchmark,   'Benchmark') },
       { path: 'settings',         Component: withBoundary(Settings,    'Settings') },
     ],
   },

@@ -16,6 +16,7 @@ from playbook.retriever import PlaybookRetriever
 from planner.repair_planner import RepairPlanner
 from patcher.patch_applier import PatchApplier
 from sandbox.validator import SandboxValidator
+from evaluation.evaluator import Evaluator
 from dotenv import load_dotenv
 
 load_dotenv(PROJECT_ROOT / ".env")
@@ -710,3 +711,14 @@ def get_accuracy_plot():
     if not path.exists():
         raise HTTPException(status_code=404, detail="accuracy_plot.png not found")
     return FileResponse(str(path), media_type="image/png")
+
+@app.get("/api/benchmark/run", tags=["System Evaluation"])
+def run_benchmark():
+    """Runs the full A/B Evaluation Benchmark dynamically returning all computed matrices."""
+    try:
+        evaluator = Evaluator()
+        results = evaluator.run()
+        return {"success": True, "data": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

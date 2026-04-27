@@ -171,6 +171,42 @@ export const fetchSettings = (): Promise<ThresholdSettings> =>
 export const updateSettings = (data: ThresholdSettings): Promise<ThresholdSettings> =>
   request('/api/settings/thresholds', { method: 'PUT', body: JSON.stringify(data) });
 
-// ── Intelligence ──────────────────────────────────────────────────────
 export const fetchIntelligence = (): Promise<unknown> =>
   request('/api/intelligence');
+
+// ── A/B Benchmark ─────────────────────────────────────────────────────
+export interface BenchmarkMetrics {
+  rsr: number;
+  mttr_mean: number;
+  mttr_std: number;
+  frr: number;
+  gv: number;
+  total: number;
+  success_count: number;
+  per_class: Record<string, { rsr: number; mttr_mean: number; count: number }>;
+}
+
+export interface BenchmarkResponse {
+  success: boolean;
+  data: {
+    selfhealing: BenchmarkMetrics;
+    baseline: BenchmarkMetrics;
+    deltas: {
+      rsr_improvement: number;
+      mttr_reduction_pct: number;
+      frr_delta: number;
+    };
+    criteria_met: {
+      rsr: boolean;
+      mttr_reduction: boolean;
+      frr: boolean;
+      gv: boolean;
+      all_met: boolean;
+    };
+    total_episodes: number;
+    evaluated_at: string;
+  };
+}
+
+export const fetchBenchmark = (): Promise<BenchmarkResponse> =>
+  request('/api/benchmark/run');
