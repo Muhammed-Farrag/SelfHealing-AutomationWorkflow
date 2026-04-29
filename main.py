@@ -183,6 +183,9 @@ class ThresholdSettings(BaseModel):
     confidence_threshold: float
     auto_patch_threshold: float
     require_human_below: float
+    auto_patch_enabled: Optional[bool] = None
+    dry_run_mode: Optional[bool] = None
+    audit_logging: Optional[bool] = None
 
 
 class ValidationRequest(BaseModel):
@@ -437,6 +440,17 @@ def get_review_queue():
     return {"queue": queue, "total": len(queue)}
 
 
+@app.get("/api/review-queue/count", tags=["Review"])
+def get_review_queue_count():
+    """Returns the current number of plans pending human review."""
+    plans = read_jsonl(REPAIR_PLANS_FILE)
+    count = sum(
+        1 for p in plans
+        if p.get("requires_human_approval") and p.get("status") not in ("applied", "rejected")
+    )
+    return {"count": count}
+
+
 @app.post("/api/review-queue/{plan_id}/approve", tags=["Review"])
 def approve_plan(plan_id: str, body: ApproveRequest):
     plans = read_jsonl(REPAIR_PLANS_FILE)
@@ -610,11 +624,34 @@ def rollback_plan(plan_id: str, body: RollbackRequest):
             "diffs": {},
         }
         append_jsonl(AUDIT_LOG_FILE, rollback_record)
+
+        # After rollback: create a pending_review entry in REPAIR_PLANS_FILE
+        # so the engineer can approve/reject the reverted state from the Review Queue.
+        review_plan_id = f"rollback_{plan_id}"
+        review_entry = {
+            "plan_id": review_plan_id,
+            "episode_id": entry.get("episode_id", ""),
+            "failure_class": entry.get("failure_class", ""),
+            "confidence": 1.0,
+            "reasoning": f"Rollback of plan {plan_id} (commit {commit_hash}). Reverted by operator.",
+            "repair_actions": [],
+            "requires_human_approval": True,
+            "status": "pending",
+            "rollback_reason": "rollback",
+            "original_plan_id": plan_id,
+        }
+        existing_plans = read_jsonl(REPAIR_PLANS_FILE)
+        # Avoid duplicates
+        existing_plans = [p for p in existing_plans if p.get("plan_id") != review_plan_id]
+        existing_plans.append(review_entry)
+        rewrite_jsonl(REPAIR_PLANS_FILE, existing_plans)
+
         return {
             "status": "rolled_back" if success else "error",
             "reverted_commit": commit_hash,
             "affected_files": list(entry.get("diffs", {}).keys()),
             "output": result.stdout or result.stderr,
+            "review_plan_id": review_plan_id,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -635,14 +672,29 @@ def get_thresholds():
 
 @app.put("/api/settings/thresholds", tags=["Settings"])
 def update_thresholds(body: ThresholdSettings):
-    for field, val in body.model_dump().items():
-        if not (0.0 <= val <= 1.0):
+    payload = body.model_dump(exclude_none=True)
+    float_fields = {"confidence_threshold", "auto_patch_threshold", "require_human_below"}
+    for field, val in payload.items():
+        if field in float_fields and not (0.0 <= val <= 1.0):
             raise HTTPException(status_code=422, detail=f"{field} must be between 0.0 and 1.0")
     current = load_settings()
-    current.update(body.model_dump())
+    current.update(payload)
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(current, f, indent=2)
     return current
+
+
+@app.get("/api/settings/defaults", tags=["Settings"])
+def get_settings_defaults():
+    """Return hardcoded default settings values."""
+    return {
+        "confidence_threshold": 0.5,
+        "auto_patch_threshold": 0.8,
+        "require_human_below": 0.5,
+        "auto_patch_enabled": True,
+        "dry_run_mode": False,
+        "audit_logging": True,
+    }
 
 
 @app.get("/api/health/startup", tags=["Health"])
@@ -703,49 +755,29 @@ async def startup_health():
         },
     )
 
-
-@app.get("/api/intelligence", tags=["Intelligence"])
-def get_intelligence():
-    metrics = {}
-    metrics_file = RESULTS_DIR / "metrics.json"
-    if metrics_file.exists():
-        with open(metrics_file, "r", encoding="utf-8") as f:
-            metrics = json.load(f)
-
-    # Compute classifier agreement from classified episodes
-    episodes = read_jsonl(EPISODES_CLASSIFIED_FILE)
-    agreed = sum(
-        1 for e in episodes
-        if e.get("ml_class") == e.get("failure_class") or e.get("ml_class") == e.get("failure_type")
+@app.post("/api/rollback/{plan_id}/dry-run", tags=["Rollback"])
+def dry_run_rollback(plan_id: str):
+    """Simulate a rollback without making any changes. Returns what would be reverted."""
+    entries = read_jsonl(AUDIT_LOG_FILE)
+    entry = next(
+        (e for e in reversed(entries)
+         if e.get("plan_id") == plan_id and e.get("git_commit_hash")),
+        None,
     )
-    total = len(episodes)
-
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"No applied commit found for plan {plan_id}")
+    commit_hash = entry["git_commit_hash"]
+    affected = list(entry.get("diffs", {}).keys())
     return {
-        "metrics": metrics,
-        "confusion_matrix_url": "/api/intelligence/confusion-matrix",
-        "accuracy_plot_url": "/api/intelligence/accuracy-plot",
-        "classifier_agreement": {
-            "agreed": agreed,
-            "total": total,
-            "rate": round(agreed / max(total, 1), 4),
-        },
+        "episode_id": entry.get("episode_id", ""),
+        "dry_run": True,
+        "plan_id": plan_id,
+        "would_revert": affected,
+        "git_command": f"git revert {commit_hash} --no-edit",
+        "estimated_impact": f"{len(affected)} file(s) would be reverted to their pre-patch state.",
+        "note": "DRY RUN SIMULATION — No changes were made",
     }
 
-
-@app.get("/api/intelligence/confusion-matrix", tags=["Intelligence"])
-def get_confusion_matrix():
-    path = RESULTS_DIR / "confusion_matrix.png"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="confusion_matrix.png not found")
-    return FileResponse(str(path), media_type="image/png")
-
-
-@app.get("/api/intelligence/accuracy-plot", tags=["Intelligence"])
-def get_accuracy_plot():
-    path = RESULTS_DIR / "accuracy_plot.png"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="accuracy_plot.png not found")
-    return FileResponse(str(path), media_type="image/png")
 
 @app.get("/api/benchmark/run", tags=["System Evaluation"])
 def run_benchmark():

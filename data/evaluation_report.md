@@ -29,10 +29,19 @@ The most significant MTTR gains originated from configuration failures (e.g. mis
 - [x] FRR < 0.1  →  achieved: 0.00
 - [x] GV = 0  →  achieved: 0
 
-## 6. Baseline Methodology
+## 6. Retrieval Quality (Playbook RAG)
+| Metric | Value | Description |
+|--------|-------|-------------|
+| Hit Rate | 0.6333 | ≥1 correct entry in top-K |
+| Precision@3 | 0.2778 | Correct entries / K |
+| MRR | 0.6167 | Mean Reciprocal Rank |
+| NDCG@3 | 0.7167 | Normalised Discounted CG |
+| Episodes w/ retrieval | 120 / 120 | Episodes that had playbook entries |
+
+## 7. Baseline Methodology
 The Airflow-retries-only simulation models transient failures (timeout, http_error) with an observed 40% overarching success rate, whereby temporal recovery consumes multiple 30s-delay retries. Structural configuration failures algorithmically default to consistent failure mappings inducing standard 600s operator handling windows. (Seed=42 for perfect reproduction).
 
-## 7. Raw Data Sources
+## 8. Raw Data Sources
 - `data/episodes_classified.jsonl`
 - `data/repair_plans.jsonl`
 - `data/validation_results.jsonl`

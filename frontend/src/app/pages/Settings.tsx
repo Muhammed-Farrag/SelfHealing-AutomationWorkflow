@@ -6,34 +6,28 @@ export function Settings() {
   const [requireHumanThreshold, setRequireHumanThreshold] = useState(0.50);
 
   const [groqKey, setGroqKey] = useState('sk-groq-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1234');
-  const [openaiKey, setOpenaiKey] = useState('sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx5678');
   const [revealGroq, setRevealGroq] = useState(false);
-  const [revealOpenai, setRevealOpenai] = useState(false);
   const [testingGroq, setTestingGroq] = useState(false);
-  const [testingOpenai, setTestingOpenai] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, string>>({});
 
   const [autoPatchEnabled, setAutoPatchEnabled] = useState(true);
   const [dryRunMode, setDryRunMode] = useState(false);
   const [auditLogging, setAuditLogging] = useState(true);
 
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; isError: boolean } | null>(null);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
+  const showToast = (msg: string, isError = false) => {
+    setToast({ msg, isError });
     setTimeout(() => setToast(null), 4000);
   };
 
-  const testConnection = (provider: 'groq' | 'openai') => {
-    const setter = provider === 'groq' ? setTestingGroq : setTestingOpenai;
-    setter(true);
+  const testConnection = (provider: 'groq') => {
+    setTestingGroq(true);
     setTimeout(() => {
-      setter(false);
+      setTestingGroq(false);
       setTestResults(prev => ({
         ...prev,
-        [provider]: provider === 'groq'
-          ? '✓ CONNECTED · latency: 312ms · model: llama-3.3-70b-versatile'
-          : '✓ CONNECTED · latency: 480ms · model: gpt-4o',
+        [provider]: '✓ CONNECTED · latency: 312ms · model: llama-3.3-70b-versatile',
       }));
     }, 1800);
   };
@@ -42,6 +36,21 @@ export function Settings() {
     if (key.length <= 4) return key;
     return '•'.repeat(key.length - 4) + key.slice(-4);
   };
+
+  // Load current settings from backend on mount
+  useEffect(() => {
+    fetch('/api/settings/thresholds')
+      .then(r => r.json())
+      .then(s => {
+        if (s.confidence_threshold !== undefined) setConfidenceThreshold(s.confidence_threshold);
+        if (s.auto_patch_threshold !== undefined) setHighConfidenceAutoApply(s.auto_patch_threshold);
+        if (s.require_human_below !== undefined) setRequireHumanThreshold(s.require_human_below);
+        if (s.auto_patch_enabled !== undefined) setAutoPatchEnabled(s.auto_patch_enabled);
+        if (s.dry_run_mode !== undefined) setDryRunMode(s.dry_run_mode);
+        if (s.audit_logging !== undefined) setAuditLogging(s.audit_logging);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     try {
@@ -52,26 +61,36 @@ export function Settings() {
           confidence_threshold: confidenceThreshold,
           auto_patch_threshold: highConfidenceAutoApply,
           require_human_below: requireHumanThreshold,
+          auto_patch_enabled: autoPatchEnabled,
+          dry_run_mode: dryRunMode,
+          audit_logging: auditLogging,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      showToast('✓ CONFIGURATION SAVED — thresholds persisted to backend');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      showToast('✓ CONFIGURATION SAVED — all settings persisted to backend');
     } catch (e: any) {
-      showToast(`⚠ SAVE FAILED: ${e.message}`);
+      showToast(`⚠ SAVE FAILED: ${e.message}`, true);
     }
   };
 
-  // Load real thresholds on mount
-  useEffect(() => {
-    fetch('/api/settings/thresholds').then(r => r.json()).then(s => {
-      if (s.confidence_threshold !== undefined) setConfidenceThreshold(s.confidence_threshold);
-      if (s.auto_patch_threshold !== undefined) setHighConfidenceAutoApply(s.auto_patch_threshold);
-      if (s.require_human_below !== undefined) setRequireHumanThreshold(s.require_human_below);
-      if (s.auto_patch_enabled !== undefined) setAutoPatchEnabled(s.auto_patch_enabled);
-      if (s.dry_run_mode !== undefined) setDryRunMode(s.dry_run_mode);
-      if (s.audit_logging !== undefined) setAuditLogging(s.audit_logging);
-    }).catch(() => {});
-  }, []);
+  const handleResetDefaults = async () => {
+    try {
+      const res = await fetch('/api/settings/defaults');
+      const defaults = await res.json();
+      setConfidenceThreshold(defaults.confidence_threshold);
+      setHighConfidenceAutoApply(defaults.auto_patch_threshold);
+      setRequireHumanThreshold(defaults.require_human_below);
+      setAutoPatchEnabled(defaults.auto_patch_enabled);
+      setDryRunMode(defaults.dry_run_mode);
+      setAuditLogging(defaults.audit_logging);
+      showToast('↺ DEFAULTS RESTORED — click Save to persist');
+    } catch {
+      showToast('⚠ Could not fetch defaults', true);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 720 }}>
@@ -110,7 +129,7 @@ export function Settings() {
 
       <Divider />
 
-      {/* Section 2: API Configuration */}
+      {/* Section 2: API Configuration — GROQ only */}
       <Section title="API CONFIGURATION">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <ApiKeyInput
@@ -122,17 +141,6 @@ export function Settings() {
             onTest={() => testConnection('groq')}
             testing={testingGroq}
             testResult={testResults['groq']}
-            maskKey={maskKey}
-          />
-          <ApiKeyInput
-            label="OPENAI_API_KEY"
-            value={openaiKey}
-            onChange={setOpenaiKey}
-            revealed={revealOpenai}
-            onReveal={() => setRevealOpenai(v => !v)}
-            onTest={() => testConnection('openai')}
-            testing={testingOpenai}
-            testResult={testResults['openai']}
             maskKey={maskKey}
           />
         </div>
@@ -167,7 +175,7 @@ export function Settings() {
         </div>
       </Section>
 
-      <div style={{ paddingTop: 8 }}>
+      <div style={{ display: 'flex', gap: 12, paddingTop: 8 }}>
         <button
           onClick={handleSave}
           style={{
@@ -184,6 +192,21 @@ export function Settings() {
         >
           SAVE CONFIGURATION
         </button>
+        <button
+          onClick={handleResetDefaults}
+          style={{
+            backgroundColor: 'transparent',
+            border: '1px solid #2a3540',
+            color: '#4a5a6a',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            padding: '10px 20px',
+            cursor: 'pointer',
+            letterSpacing: '0.1em',
+          }}
+        >
+          RESET TO DEFAULTS
+        </button>
       </div>
 
       {/* Toast */}
@@ -194,7 +217,7 @@ export function Settings() {
           right: 24,
           backgroundColor: '#111418',
           border: '1px solid #1e2530',
-          borderLeft: '3px solid #00d4aa',
+          borderLeft: `3px solid ${toast.isError ? '#ef4444' : '#00d4aa'}`,
           padding: '12px 20px',
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 11,
@@ -205,8 +228,8 @@ export function Settings() {
           gap: 16,
           animation: 'fadeIn 0.2s ease',
         }}>
-          <span style={{ color: '#00d4aa' }}>✓</span>
-          {toast}
+          <span style={{ color: toast.isError ? '#ef4444' : '#00d4aa' }}>{toast.isError ? '⚠' : '✓'}</span>
+          {toast.msg}
           <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', color: '#4a5a6a', cursor: 'pointer', fontSize: 14 }}>×</button>
         </div>
       )}

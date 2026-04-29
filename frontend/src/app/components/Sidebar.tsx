@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router';
-import { REPAIR_PLANS } from '../data/mockData';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/' },
@@ -9,15 +8,28 @@ const NAV_ITEMS = [
   { label: 'Review Queue', path: '/review' },
   { label: 'Audit Trail', path: '/audit' },
   { label: 'Rollback', path: '/rollback' },
-  { label: 'Intelligence', path: '/intelligence' },
   { label: 'A/B Benchmark', path: '/benchmark' },
   { label: 'Settings', path: '/settings' },
 ];
 
-const pendingCount = REPAIR_PLANS.filter(p => p.requiresHuman && p.status === 'pending').length;
-
 export function Sidebar() {
   const location = useLocation();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Fetch real count from backend on mount and every 30 seconds
+  useEffect(() => {
+    const fetchCount = () => {
+      fetch('/api/review-queue/count')
+        .then(r => r.json())
+        .then(data => {
+          if (typeof data.count === 'number') setPendingCount(data.count);
+        })
+        .catch(() => {});
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <aside

@@ -9,6 +9,45 @@ const FAILURE_COLORS: Record<string, string> = {
   missing_db: '#f97316',
 };
 
+const FAILURE_CLASS_DISTRIBUTION = [
+  { class: 'TIMEOUT',        count: 30, color: '#00ff88' },
+  { class: 'MISSING_FILE',   count: 30, color: '#00d4ff' },
+  { class: 'HTTP_ERROR',     count: 30, color: '#ff6b35' },
+  { class: 'MISSING_COLUMN', count: 30, color: '#ffd700' },
+];
+const totalDist = FAILURE_CLASS_DISTRIBUTION.reduce((s, i) => s + i.count, 0);
+
+const DonutChart = ({ data, total }: { data: typeof FAILURE_CLASS_DISTRIBUTION; total: number }) => {
+  const size = 120, cx = 60, cy = 60, r = 45, strokeWidth = 14;
+  const circ = 2 * Math.PI * r;
+  let cumulativePct = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {data.map(item => {
+        const pct = item.count / total;
+        const dash = pct * circ;
+        const gap = circ - dash;
+        const dashOffset = -(cumulativePct * circ);
+        cumulativePct += pct;
+        return (
+          <circle
+            key={item.class}
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={item.color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={dashOffset}
+            style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+          />
+        );
+      })}
+      <text x={cx} y={cy + 5} textAnchor="middle" fill="#d0d8e4" fontSize={12}
+        fontFamily="JetBrains Mono, monospace">{total}</text>
+    </svg>
+  );
+};
+
 export function Benchmark() {
   const [res, setRes] = useState<BenchmarkResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -158,6 +197,83 @@ export function Benchmark() {
           </table>
         </Panel>
       </div>
+
+      {/* Failure Class Distribution */}
+      <Panel title="FAILURE CLASS DISTRIBUTION">
+        <div style={{ display: 'flex', gap: 32, alignItems: 'center', justifyContent: 'center', padding: '12px 0' }}>
+          <DonutChart data={FAILURE_CLASS_DISTRIBUTION} total={totalDist} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {FAILURE_CLASS_DISTRIBUTION.map(item => (
+              <div key={item.class} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 10, height: 10, backgroundColor: item.color, flexShrink: 0 }} />
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#d0d8e4', minWidth: 100 }}>
+                  {item.class}
+                </span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: item.color }}>
+                  {((item.count / totalDist) * 100).toFixed(1)}%
+                </span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#4a5a6a' }}>
+                  ({item.count})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Panel>
+
+      {/* Success Criteria */}
+      <Panel title="SUCCESS CRITERIA">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+          <thead>
+            <tr>
+              {['METRIC', 'TARGET'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '6px 12px', color: '#4a9eff', borderBottom: '1px solid #1e3a2e', fontWeight: 600, letterSpacing: '0.08em', fontSize: 10 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { metric: 'RSR',            target: '> 70%' },
+              { metric: 'MTTR Reduction', target: '> 40%' },
+              { metric: 'FRR',            target: '< 10%' },
+              { metric: 'GV',             target: '= 0'   },
+            ].map((row, i) => (
+              <tr key={row.metric} style={{ background: i % 2 === 0 ? 'rgba(0,255,136,0.03)' : 'transparent' }}>
+                <td style={{ padding: '8px 12px', color: '#00ff88' }}>{row.metric}</td>
+                <td style={{ padding: '8px 12px', color: '#d0d8e4' }}>{row.target}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
+
+      {/* Retrieval Quality (Playbook RAG) */}
+      <Panel title="RETRIEVAL QUALITY (PLAYBOOK RAG)">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+          <thead>
+            <tr>
+              {['METRIC', 'VALUE', 'INTERPRETATION'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '6px 12px', color: '#4a9eff', borderBottom: '1px solid #1e3a2e', fontWeight: 600, letterSpacing: '0.08em', fontSize: 10 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { metric: 'Hit Rate',    value: '0.6333',  interpretation: 'Relevant result found in ~63% of cases' },
+              { metric: 'Precision@3', value: '0.2778',  interpretation: '~1 correct result per 3 retrieved' },
+              { metric: 'MRR',         value: '0.6167',  interpretation: 'Correct result usually ranked early' },
+              { metric: 'NDCG@3',      value: '0.7167',  interpretation: 'Good ranking quality' },
+              { metric: 'Coverage',    value: '120/120', interpretation: 'Retrieval applied to all episodes' },
+            ].map((row, i) => (
+              <tr key={row.metric} style={{ background: i % 2 === 0 ? 'rgba(0,255,136,0.03)' : 'transparent' }}>
+                <td style={{ padding: '8px 12px', color: '#00ff88' }}>{row.metric}</td>
+                <td style={{ padding: '8px 12px', color: '#ffd700' }}>{row.value}</td>
+                <td style={{ padding: '8px 12px', color: '#d0d8e4' }}>{row.interpretation}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
 
     </div>
   );

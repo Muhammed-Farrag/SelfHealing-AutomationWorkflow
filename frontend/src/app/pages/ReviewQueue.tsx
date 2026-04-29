@@ -104,15 +104,31 @@ function ReviewPlanCard({ plan, isSelected, onToggle, onApprove, onReject, busy 
   plan: ApiPlan; isSelected: boolean; onToggle: () => void; onApprove: () => void; onReject: () => void; busy: boolean;
 }) {
   const color = FAILURE_COLORS[plan.failure_class] || '#4a5a6a';
+  const isRollback = (plan as any).rollback_reason === 'rollback';
   return (
-    <div style={{ backgroundColor: '#111418', border: `1px solid ${isSelected ? '#00d4aa' : '#1e2530'}`, display: 'flex', gap: 0 }}>
+    <div style={{ backgroundColor: '#111418', border: `1px solid ${isSelected ? '#00d4aa' : isRollback ? '#3b82f6' : '#1e2530'}`, display: 'flex', gap: 0 }}>
       <div style={{ padding: '16px 16px', display: 'flex', alignItems: 'flex-start', borderRight: '1px solid #1e2530' }}>
         <input type="checkbox" checked={isSelected} onChange={onToggle} style={{ width: 14, height: 14, accentColor: '#00d4aa', cursor: 'pointer', marginTop: 2 }} />
       </div>
       <div style={{ flex: 1, padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#d0d8e4', marginBottom: 6 }}>{plan.plan_id}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#d0d8e4' }}>{plan.plan_id}</div>
+              {isRollback && (
+                <span style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 8,
+                  color: '#3b82f6',
+                  border: '1px solid #3b82f6',
+                  padding: '1px 6px',
+                  letterSpacing: '0.1em',
+                  backgroundColor: 'rgba(59,130,246,0.1)',
+                }}>
+                  [ROLLBACK]
+                </span>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color, border: `1px solid ${color}`, padding: '2px 7px', backgroundColor: `${color}15` }}>{plan.failure_class?.toUpperCase()}</span>
               {plan.episode_id && <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#4a5a6a' }}>ep: {plan.episode_id}</span>}
@@ -133,3 +149,4 @@ function ReviewPlanCard({ plan, isSelected, onToggle, onApprove, onReject, busy 
     </div>
   );
 }
+
