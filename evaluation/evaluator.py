@@ -168,6 +168,39 @@ class Evaluator:
             "per_class": class_metrics
         }
 
+    def _compute_retrieval_metrics(self, episodes: List[Dict[str, Any]], K: int = 3) -> Dict[str, Any]:
+        """Compute Precision@K, Hit Rate, MRR, and NDCG@K for playbook retrieval."""
+        hits, rr_list, ndcg_list, pk_list = [], [], [], []
+        for ep in episodes:
+            retrieved = ep.get("retrieved_playbook_entries", [])[:K]
+            ground_truth = ep.get("failure_class", "") or ep.get("failure_type", "")
+            match_flags = [
+                int(r.get("failure_class", "") == ground_truth)
+                for r in retrieved
+            ]
+            hit = int(any(match_flags))
+            hits.append(hit)
+            pk_list.append(sum(match_flags) / K if K > 0 else 0.0)
+            first_rank = next(
+                (i + 1 for i, f in enumerate(match_flags) if f == 1), None
+            )
+            rr_list.append(1 / first_rank if first_rank else 0.0)
+            dcg = sum(
+                f / (i + 1) for i, f in enumerate(match_flags)
+            )
+            ndcg_list.append(dcg)  # idcg = 1.0 (single relevant doc per query)
+        n = max(len(hits), 1)
+        episodes_with_retrieval = sum(1 for ep in episodes if ep.get("retrieved_playbook_entries"))
+        return {
+            "hit_rate":           round(sum(hits) / n, 4),
+            "precision_at_k":    round(sum(pk_list) / n, 4),
+            "mrr":               round(sum(rr_list) / n, 4),
+            "ndcg_at_k":         round(sum(ndcg_list) / n, 4),
+            "k":                 K,
+            "total_episodes":    n,
+            "episodes_with_retrieval": episodes_with_retrieval,
+        }
+
     def _compute_baseline_metrics(self, episodes: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Simulate Airflow-retries-only baseline using fixed random seed."""
         total_episodes = len(episodes)
@@ -431,10 +464,19 @@ The most significant MTTR gains originated from configuration failures (e.g. mis
 - {chkbox(cr["frr"])} FRR < {self.SUCCESS_CRITERIA["frr_target"]}  →  achieved: {sh["frr"]:.2f}
 - {chkbox(cr["gv"])} GV = 0  →  achieved: {sh["gv"]}
 
-## 6. Baseline Methodology
+## 6. Retrieval Quality (Playbook RAG)
+| Metric | Value | Description |
+|--------|-------|-------------|
+| Hit Rate | {results.get('retrieval_metrics', {}).get('hit_rate', 0.0):.4f} | ≥1 correct entry in top-K |
+| Precision@{results.get('retrieval_metrics', {}).get('k', 3)} | {results.get('retrieval_metrics', {}).get('precision_at_k', 0.0):.4f} | Correct entries / K |
+| MRR | {results.get('retrieval_metrics', {}).get('mrr', 0.0):.4f} | Mean Reciprocal Rank |
+| NDCG@{results.get('retrieval_metrics', {}).get('k', 3)} | {results.get('retrieval_metrics', {}).get('ndcg_at_k', 0.0):.4f} | Normalised Discounted CG |
+| Episodes w/ retrieval | {results.get('retrieval_metrics', {}).get('episodes_with_retrieval', 0)} / {results.get('retrieval_metrics', {}).get('total_episodes', 0)} | Episodes that had playbook entries |
+
+## 7. Baseline Methodology
 The Airflow-retries-only simulation models transient failures (timeout, http_error) with an observed 40% overarching success rate, whereby temporal recovery consumes multiple 30s-delay retries. Structural configuration failures algorithmically default to consistent failure mappings inducing standard 600s operator handling windows. (Seed={self.baseline_seed} for perfect reproduction).
 
-## 7. Raw Data Sources
+## 8. Raw Data Sources
 - `{self.episodes_path}`
 - `{self.plans_path}`
 - `{self.validation_path}`
@@ -463,11 +505,18 @@ The Airflow-retries-only simulation models transient failures (timeout, http_err
         deltas = self._compute_deltas(sh, bl)
         cr = self._check_criteria(sh, deltas)
 
+        # Retrieval metrics — uses enriched episodes if available
+        enriched_path = self.episodes_path.replace("classified", "enriched") \
+            if "classified" in self.episodes_path else self.episodes_path
+        ep_enriched = self._load_jsonl(enriched_path) or ep
+        retrieval_metrics = self._compute_retrieval_metrics(ep_enriched, K=3)
+
         results = {
             "selfhealing": sh,
             "baseline": bl,
             "deltas": deltas,
             "criteria_met": cr,
+            "retrieval_metrics": retrieval_metrics,
             "total_episodes": len(ep),
             "evaluated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
