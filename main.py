@@ -12,6 +12,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from classifier.classifier import RegexFailureClassifier
+from classifier.ml_classifier import MLClassifier
+import pickle
 from playbook.retriever import PlaybookRetriever
 from planner.repair_planner import RepairPlanner
 from patcher.patch_applier import PatchApplier
@@ -47,6 +49,7 @@ SETTINGS_FILE = PROJECT_ROOT / "settings.json"
 
 # --- Singletons ---
 classifier: Optional[RegexFailureClassifier] = None
+ml_model: Optional[MLClassifier] = None
 retriever: Optional[PlaybookRetriever] = None
 planner: Optional[RepairPlanner] = None
 patcher: Optional[PatchApplier] = None
@@ -55,8 +58,21 @@ validator: Optional[SandboxValidator] = None
 
 @app.on_event("startup")
 async def startup_event():
-    global classifier, retriever, planner, patcher, validator
+    global classifier, ml_model, retriever, planner, patcher, validator
     classifier = RegexFailureClassifier()
+    # --- Load ML Classifier from saved pipeline ---
+    pkl_path = RESULTS_DIR / "pipeline.pkl"
+    if pkl_path.exists():
+        try:
+            with open(pkl_path, "rb") as f:
+                pipeline = pickle.load(f)
+            ml_model = MLClassifier()
+            ml_model.pipeline = pipeline
+            print("[startup] MLClassifier loaded from pipeline.pkl")
+        except Exception as e:
+            print(f"[startup] WARNING: Failed to load pipeline.pkl — {e}")
+    else:
+        print("[startup] WARNING: pipeline.pkl not found — MLClassifier not loaded")
     retriever = PlaybookRetriever()
     planner = RepairPlanner(
         use_local=False,
@@ -109,6 +125,16 @@ def load_settings() -> Dict:
         "dry_run_mode": False,
         "audit_logging": True,
     }
+
+
+def _ml_classify(log_excerpt: str, fallback: str) -> str:
+    """Run MLClassifier inference, falling back to regex label if model is not loaded."""
+    if ml_model is not None and log_excerpt:
+        try:
+            return ml_model.predict_log(log_excerpt)
+        except Exception:
+            pass
+    return fallback
 
 
 # --- Pydantic Schemas ---
@@ -240,7 +266,7 @@ def get_episodes():
             "playbook_matches": playbook_matches,
             # Classifier agreement fields
             "regex_class": ep.get("failure_type", failure_class),
-            "ml_class": failure_class,
+            "ml_class": _ml_classify(ep.get("log_excerpt", ""), failure_class),
             "classifiers_agree": ep.get("failure_type", "") == failure_class,
         })
 
@@ -329,8 +355,17 @@ def get_dashboard_stats():
     applied_ids = {a.get("plan_id") for a in audit_entries if a.get("status") == "applied" and a.get("plan_id")}
     auto_patch_rate = round(min(len(applied_ids) / max(total, 1) * 100, 100.0), 1)
 
-    # MTTR: average time between applied_at timestamps (simplified)
-    mttr = 4.2
+    # MTTR: real average from audit entries that have mttr_seconds recorded
+    applied_with_mttr = [
+        a for a in audit_entries
+        if a.get("status") == "applied" and a.get("mttr_seconds")
+    ]
+    mttr = round(
+        sum(float(a["mttr_seconds"]) for a in applied_with_mttr)
+        / max(len(applied_with_mttr), 1)
+        / 60,
+        1,
+    )
 
     # Pending review: plans requiring human approval that are not yet decided
     pending_plans = [p for p in plans if p.get("requires_human_approval") and p.get("status") not in ("applied", "rejected")]
@@ -719,6 +754,23 @@ def run_benchmark():
         evaluator = Evaluator()
         results = evaluator.run()
         return {"success": True, "data": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/benchmark/retrieval", tags=["System Evaluation"])
+def retrieval_metrics_endpoint():
+    """Return retrieval quality metrics: Hit Rate, MRR, Precision@K, NDCG@K."""
+    try:
+        # Load enriched episodes (they contain retrieved_playbook_entries)
+        episodes = read_jsonl(EPISODES_ENRICHED_FILE)
+        if not episodes:
+            episodes = read_jsonl(EPISODES_CLASSIFIED_FILE)
+        if not episodes:
+            episodes = read_jsonl(EPISODES_FILE)
+        evaluator = Evaluator()
+        metrics = evaluator._compute_retrieval_metrics(episodes, K=3)
+        return {"status": "ok", "metrics": metrics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
